@@ -1,0 +1,259 @@
+@import url('https://fonts.cdnfonts.com/css/parisine-std');
+
+* { 
+  box-sizing: border-box; 
+  margin: 0; 
+  padding: 0; 
+}
+
+body {
+  font-family: 'Parisine Std', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #002855;
+  color: #fff;
+  overflow-x: hidden;
+}
+
+/* HEADER */
+.sncf-header {
+  background: #001d3d;
+  border-bottom: 3px solid #0052a3;
+}
+.sncf-header.trip-mode {
+  background: linear-gradient(135deg, #001d3d 0%, #003875 100%);
+}
+.sncf-logo {
+  font-size: 1.8rem;
+  font-weight: 900;
+  letter-spacing: 1px;
+  background: white;
+  color: #002855;
+  border-radius: 4px;
+  padding: 0.3rem 1rem;
+}
+.header-title {
+  font-weight: 700;
+  text-transform: uppercase;
+  color: white;
+  font-size: 1.4rem;
+}
+
+/* TRIP HEADER */
+.trip-header-section {
+  background: rgba(0, 40, 85, 0.3);
+  border: 1px solid rgba(255,255,255,0.1);
+  backdrop-filter: blur(10px);
+}
+.trip-main-info {
+  display: flex;
+  align-items: center;
+}
+.trip-number-badge {
+  background: #0052a3;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: 900;
+  font-size: 1.2rem;
+  min-width: 80px;
+  text-align: center;
+}
+.trip-name {
+  font-weight: 800;
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: white;
+}
+.trip-route {
+  font-weight: 600;
+  color: rgba(255,255,255,0.9);
+  font-size: 1.1rem;
+}
+.trip-type {
+  display: inline-block;
+  background: rgba(255,255,255,0.1);
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.coach-info {
+  font-weight: 600;
+  color: rgba(255,255,255,0.8);
+  font-size: 0.9rem;
+}
+
+/* TIMELINE */
+.timeline-section {
+  position: relative;
+  padding: 2rem 0;
+}
+.timeline-container {
+  position: relative;
+  max-width: 800px;
+  margin: 0 auto;
+}
+.timeline-line {
+  position: absolute;
+  left: 50px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(to bottom, #0052a3, #003875);
+  border-radius: 2px;
+}
+.timeline-stops {
+  position: relative;
+  z-index: 2;
+}
+
+.timeline-stop {
+  display: flex;
+  align-items: center;
+  margin-bottom: 2rem;
+  position: relative;
+}
+.timeline-stop:last-child {
+  margin-bottom: 0;
+}
+
+.stop-marker {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #0052a3;
+  border: 3px solid #002855;
+  position: relative;
+  z-index: 3;
+  flex-shrink: 0;
+}
+.stop-marker.current {
+  background: #ffd700;
+  box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.3);
+}
+.stop-marker.passed {
+  background: #00ff88;
+}
+.stop-marker.future {
+  background: #0052a3;
+}
+
+.stop-content {
+  background: rgba(0, 40, 85, 0.4);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 1rem 1.5rem;
+  margin-left: 2rem;
+  flex: 1;
+  transition: all 0.3s ease;
+}
+.stop-content:hover {
+  background: rgba(0, 40, 85, 0.6);
+  transform: translateX(5px);
+}
+.stop-content.current {
+  background: rgba(255, 215, 0, 0.1);
+  border-color: rgba(255, 215, 0, 0.3);
+}
+
+.stop-header {
+  display: flex;
+  justify-content: between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.stop-name {
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: white;
+  flex: 1;
+}
+.stop-time {
+  font-weight: 900;
+  font-size: 1rem;
+}
+
+.stop-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.stop-platform {
+  background: rgba(255,255,255,0.1);
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.stop-status {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.status-on-time {
+  color: #00ff88;
+}
+.status-delayed {
+  color: #ffd700;
+}
+.status-early {
+  color: #00b4ff;
+}
+.status-canceled {
+  color: #ff4444;
+  text-decoration: line-through;
+}
+
+/* STATUS SECTION */
+.status-section {
+  background: rgba(0, 40, 85, 0.2);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+.status-title {
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+  color: white;
+}
+.status-badge {
+  display: inline-block;
+  padding: 0.7rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: 1.1rem;
+  background: #0052a3;
+}
+.next-stop {
+  font-weight: 800;
+  font-size: 1.2rem;
+  color: #ffd700;
+}
+
+/* RESPONSIVE */
+@media (max-width: 767.98px) {
+  .trip-main-info {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .trip-number-badge {
+    margin-bottom: 1rem;
+  }
+  .timeline-line {
+    left: 30px;
+  }
+  .stop-content {
+    margin-left: 1.5rem;
+    padding: 1rem;
+  }
+  .stop-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .stop-time {
+    margin-top: 0.3rem;
+  }
+  .header-title {
+    font-size: 1.1rem;
+  }
+  .sncf-logo {
+    font-size: 1.4rem;
+  }
+}
