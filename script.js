@@ -70,7 +70,19 @@ function renderBoard(departures){
     const destination=escapeHtml(info.direction||(dep.terminus&&dep.terminus.name)||"—");
     const color=info.color?("#"+info.color):"#0052a3";
     const canceled=info.status && info.status.toLowerCase().includes("cancelled");
-    const tripId = dep.links?.find(link => link.type === "trip")?.id || null;
+    
+    // Get trip ID - improved extraction
+    let tripId = null;
+    if (dep.links) {
+      const tripLink = dep.links.find(link => link.type === "trip");
+      if (tripLink) {
+        tripId = tripLink.id;
+      }
+    }
+    // Alternative way to get trip ID
+    if (!tripId && dep.trip) {
+      tripId = dep.trip.id;
+    }
 
     let logoHtml="", textHtml="";
     if(trainType.toUpperCase().includes("TER")){ logoHtml='<img src="logo/ter.svg" class="train-logo" alt="TER">'; textHtml='<span class="train-logo-text">HDF</span>'; }
@@ -109,10 +121,11 @@ function renderBoard(departures){
       `<span class="on-time">${r.originalDisplay}</span>`;
     const typeCell=r.logoHtml ? `<div class="col-type">${r.logoHtml} ${r.textHtml}</div>`:`<div class="col-type">${r.textHtml}</div>`;
     
-    // Add clickable row with trip ID
-    const clickableAttr = r.tripId ? `data-trip-id="${r.tripId}" style="cursor: pointer;"` : '';
+    // Make row clickable if tripId exists
+    const clickableClass = r.tripId ? 'clickable-train-row' : '';
+    const tripIdAttr = r.tripId ? `data-trip-id="${r.tripId}"` : '';
     
-    return `<div class="${rowClass}" ${clickableAttr}>
+    return `<div class="${rowClass} ${clickableClass}" ${tripIdAttr}>
       <div class="col-line"><span class="line-badge" style="background-color:${r.color}">${r.lineEsc}</span></div>
       <div class="col-mission">${r.missionEsc}</div>
       <div class="col-destination">${r.destination}</div>
@@ -121,11 +134,24 @@ function renderBoard(departures){
     </div>`;
   }).join("\n");
 
-  // Add click event listeners to trip rows
-  document.querySelectorAll('.train-row[data-trip-id]').forEach(row => {
-    row.addEventListener('click', () => {
+  // Add click event listeners to all clickable rows
+  addRowClickListeners();
+}
+
+function addRowClickListeners() {
+  const clickableRows = document.querySelectorAll('.clickable-train-row');
+  clickableRows.forEach(row => {
+    // Remove existing listeners to avoid duplicates
+    row.replaceWith(row.cloneNode(true));
+  });
+  
+  // Add fresh listeners
+  document.querySelectorAll('.clickable-train-row').forEach(row => {
+    row.addEventListener('click', (e) => {
       const tripId = row.getAttribute('data-trip-id');
-      window.location.href = `https://rainarthemir.github.io/sncf/trip?${tripId}`;
+      if (tripId) {
+        window.location.href = `https://rainarthemir.github.io/sncf/trip?${tripId}`;
+      }
     });
   });
 }
@@ -149,4 +175,13 @@ suggestionsBox.addEventListener("click",(e)=>{
   fetchDepartures(id);
 });
 
-refreshBtn.addEventListener("click",()=>{ if(currentStation) fetchDepartures(currentStation); });
+refreshBtn.addEventListener("click",()=>{ 
+  if(currentStation) fetchDepartures(currentStation); 
+});
+
+// Add filter change listener
+trainTypeSelect.addEventListener("change", () => {
+  if (lastDepartures.length > 0) {
+    renderBoard(lastDepartures);
+  }
+});
