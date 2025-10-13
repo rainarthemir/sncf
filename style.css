@@ -120,12 +120,39 @@ body {
 .canceled-text { color:#ff4d4d; font-weight:900; margin-left:0.5rem; }
 
 /* train type column + логотипы */
-.col-type { font-weight:700; opacity:0.95; text-transform:capitalize; display:flex; align-items:center; gap:0.4rem; }
-.train-logo { height:12px; width:auto; } /* нормальный размер */
-.train-logo-text { font-size:0.85rem; color:#fff; font-weight:700; }
+/* train type column + логотипы */
+.col-type { 
+  font-weight:700; 
+  opacity:0.95; 
+  text-transform:capitalize; 
+  display:flex; 
+  align-items:center; 
+  gap:0.4rem; 
+}
 
-/* для RER и Transilien фон белый под логотип */
-.train-logo.rer, .train-logo.transilien { background:white; padding:2px; border-radius:2px; }
+/* логотипы уменьшаем, чтобы не занимали много места */
+.train-logo { 
+  height:16px; /* небольшая иконка */
+  width:auto; 
+  display:inline-block;
+}
+
+/* текст рядом с логотипом */
+.train-logo-text { 
+  font-size:0.85rem; 
+  color:#fff; 
+  font-weight:700; 
+  display:inline-block;
+}
+
+/* для RER и Transilien делаем белый фон под логотип */
+.train-logo.rer, .train-logo.transilien { 
+  background:white; 
+  padding:2px; 
+  border-radius:2px; 
+  display:inline-block;
+}
+
 
 /* no-data */
 .no-data { text-align:center; padding:2rem; color: rgba(255,255,255,0.85); font-weight:700; }
@@ -153,3 +180,4 @@ body {
   .header-title { font-size:1.6rem; }
   .col-type { font-size:0.85rem; }
 }
+
