@@ -7,221 +7,246 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-<div class="App departures-mode">
-  <header class="sncf-header departures-mode">
-    <div class="header-content">
-      <div class="sncf-logo">SNCF</div>
-      <div class="header-title">Départs</div>
-    </div>
-  </header>
-
-  <main class="container">
-    <section class="search-section">
-      <label class="search-label" for="stationSearch">Rechercher une gare</label>
-      <div class="search-wrapper">
-        <input id="stationSearch" class="search-input" type="search" placeholder="Ex: Paris Montparnasse" autocomplete="off" />
-        <div id="suggestions" class="suggestions" role="listbox" aria-hidden="true"></div>
+  <div class="App departures-mode">
+    <header class="sncf-header departures-mode">
+      <div class="header-content">
+        <div class="sncf-logo">SNCF</div>
+        <div class="header-title">Départs</div>
       </div>
+    </header>
 
-      <div class="filters" style="margin-top:1rem; display:flex; gap:1rem; flex-wrap:wrap;">
-        <div>
-          <label for="trainType" style="color:#fff;font-weight:700">Type de train</label><br />
-          <select id="trainType" style="padding:0.6rem;border-radius:4px;margin-top:0.3rem;">
-            <option value="all">Tous</option>
-            <option value="TER">TER</option>
-            <option value="TGV">TGV</option>
-            <option value="TRANSILIEN">Transilien</option>
-            <option value="INTERCITÉS">Intercités</option>
-            <option value="RER">RER</option>
-          </select>
+    <main class="container">
+      <!-- Search Section -->
+      <section class="search-section">
+        <label class="search-label" for="stationSearch">Rechercher une gare</label>
+        <div class="search-wrapper">
+          <input id="stationSearch" class="search-input" type="search" placeholder="Ex: Paris Montparnasse" autocomplete="off" />
+          <div id="suggestions" class="suggestions" role="listbox" aria-hidden="true"></div>
         </div>
 
-        <div style="align-self:center;">
-          <label style="color:#fff;font-weight:700">
-            <input id="delayedOnly" type="checkbox" /> Seulement en retard
-          </label>
+        <div class="filters" style="margin-top: 1rem; display:flex; gap:1rem; flex-wrap:wrap;">
+          <div>
+            <label for="trainType" style="color:#fff;font-weight:700">Type de train</label><br />
+            <select id="trainType" style="padding:0.6rem;border-radius:4px;margin-top:0.3rem;">
+              <option value="all">Tous</option>
+              <option value="TER">TER</option>
+              <option value="TGV">TGV</option>
+              <option value="TRANSILIEN">Transilien</option>
+              <option value="INTERCITÉS">Intercités</option>
+              <option value="RER">RER</option>
+            </select>
+          </div>
+
+          <div style="align-self:center;">
+            <label style="color:#fff;font-weight:700">
+              <input id="delayedOnly" type="checkbox" /> Seulement en retard
+            </label>
+          </div>
+
+          <div style="margin-left:auto; align-self:center;">
+            <button id="refreshBtn" class="refresh-btn">Actualiser</button>
+          </div>
         </div>
+      </section>
 
-        <div style="margin-left:auto; align-self:center;">
-          <button id="refreshBtn" class="refresh-btn">Actualiser</button>
+      <!-- Board Section -->
+      <section class="board-section">
+        <div class="board">
+          <div class="board-header">
+            <div class="col-line">LIGNE</div>
+            <div class="col-mission">MISSION</div>
+            <div class="col-destination">DESTINATION</div>
+            <div class="col-time">HEURE</div>
+            <div class="col-type">TYPE</div>
+          </div>
+
+          <div id="board-body" class="board-body">
+            <div class="no-data">Tapez une gare pour commencer (ex. « Paris Montparnasse »)</div>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </main>
+  </div>
 
-    <section class="board-section">
-      <div class="board">
-        <div class="board-header">
-          <div class="col-mission">MISSION</div>
-          <div class="col-destination">DESTINATION</div>
-          <div class="col-time">HEURE</div>
-          <div class="col-type">TYPE</div>
-        </div>
+  <script>
+  // ====== Конфиг ======
+  const API_KEY = "e41a2be9-7450-4f1a-a7e6-eb429950186f";
+  const stationInput = document.getElementById("stationSearch");
+  const suggestionsBox = document.getElementById("suggestions");
+  const boardBody = document.getElementById("board-body");
+  const trainTypeSelect = document.getElementById("trainType");
+  const delayedOnlyCheckbox = document.getElementById("delayedOnly");
+  const refreshBtn = document.getElementById("refreshBtn");
 
-        <div id="board-body" class="board-body">
-          <div class="no-data">Tapez une gare pour commencer (ex. « Paris Montparnasse »)</div>
-        </div>
-      </div>
-    </section>
-  </main>
-</div>
+  let currentStation = null;
+  let lastDepartures = [];
 
-<script>
-const API_KEY = "e41a2be9-7450-4f1a-a7e6-eb429950186f";
-const stationInput = document.getElementById("stationSearch");
-const suggestionsBox = document.getElementById("suggestions");
-const boardBody = document.getElementById("board-body");
-const trainTypeSelect = document.getElementById("trainType");
-const delayedOnlyCheckbox = document.getElementById("delayedOnly");
-const refreshBtn = document.getElementById("refreshBtn");
+  // ====== Утилиты ======
+  function escapeHtml(s = "") {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+  }
 
-let currentStation = null;
-let lastDepartures = [];
+  function formatTimeFromNavitia(ts) {
+    if (!ts || ts.length < 13) return "—";
+    const hhmm = ts.slice(9, 13);
+    return hhmm.slice(0, 2) + "h" + hhmm.slice(2);
+  }
 
-// ====== Utils ======
-function escapeHtml(s="") {
-  return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
+  function parseHHMMfromNavitia(ts) {
+    if (!ts || ts.length < 13) return null;
+    const hh = parseInt(ts.slice(9,11), 10);
+    const mm = parseInt(ts.slice(11,13), 10);
+    if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
+    return ((hh % 24) * 60) + (mm % 60);
+  }
 
-function formatTime(ts){
-  if(!ts||ts.length<13) return "—";
-  const hhmm = ts.slice(9,13);
-  return hhmm.slice(0,2)+'h'+hhmm.slice(2);
-}
+  function minutesToHHhMM(mins) {
+    mins = ((mins % (24*60)) + (24*60)) % (24*60);
+    const hh = Math.floor(mins / 60);
+    const mm = mins % 60;
+    return String(hh).padStart(2, '0') + 'h' + String(mm).padStart(2, '0');
+  }
 
-function parseMinutes(ts){
-  if(!ts||ts.length<13) return null;
-  const h=parseInt(ts.slice(9,11)), m=parseInt(ts.slice(11,13));
-  if(isNaN(h)||isNaN(m)) return null;
-  return h*60 + m;
-}
+  function addMinutesToNavitia(ts, addMinutes) {
+    const baseM = parseHHMMfromNavitia(ts);
+    if (baseM === null) return null;
+    return minutesToHHhMM(baseM + addMinutes);
+  }
 
-function minutesToHHhMM(mins){
-  mins = ((mins % (24*60)) + (24*60)) % (24*60);
-  const hh=Math.floor(mins/60), mm=mins%60;
-  return String(hh).padStart(2,'0')+'h'+String(mm).padStart(2,'0');
-}
+  function diffMinutes(baseTs, realTs) {
+    const b = parseHHMMfromNavitia(baseTs);
+    const r = parseHHMMfromNavitia(realTs);
+    if (b === null || r === null) return 0;
+    let diff = r - b;
+    if (diff < -12*60) diff += 24*60;
+    if (diff > 12*60) diff -= 24*60;
+    return diff;
+  }
 
-function addMinutes(ts, add){
-  const mins=parseMinutes(ts);
-  if(mins===null) return null;
-  return minutesToHHhMM(mins+add);
-}
+  // ====== Поиск станций ======
+  async function searchStations(q) {
+    if (!q || q.trim().length < 2) return [];
+    const url = `https://api.sncf.com/v1/coverage/sncf/places?q=${encodeURIComponent(q)}&type[]=stop_area&count=50`;
+    try {
+      const res = await fetch(url, { headers: { Authorization: "Basic " + btoa(API_KEY + ":") } });
+      if (!res.ok) return [];
+      const json = await res.json();
+      return (json.places || []).map(p => ({ id: p.id, label: p.stop_area?.label || p.name || p.id }));
+    } catch (e) { console.error(e); return []; }
+  }
 
-// ====== Search stations ======
-async function searchStations(q){
-  if(!q||q.trim().length<2) return [];
-  const url = `https://api.sncf.com/v1/coverage/sncf/places?q=${encodeURIComponent(q)}&type[]=stop_area&count=50`;
-  try{
-    const res=await fetch(url,{headers:{Authorization:"Basic "+btoa(API_KEY+":")}});
-    if(!res.ok) return [];
-    const json=await res.json();
-    return (json.places||[]).map(p=>({id:p.id,label:p.stop_area?.label||p.name||p.id}));
-  }catch(e){console.error(e); return [];}
-}
+  // ====== Получение отправлений ======
+  async function fetchDepartures(stopId) {
+    if (!stopId) return;
+    const now = new Date().toISOString().replace(/[-:]/g,"").split(".")[0];
+    const url = `https://api.sncf.com/v1/coverage/sncf/stop_areas/${encodeURIComponent(stopId)}/departures?datetime=${now}&count=200`;
+    try {
+      const res = await fetch(url, { headers: { Authorization: "Basic " + btoa(API_KEY + ":") } });
+      if (!res.ok) { boardBody.innerHTML = `<div class="no-data">Erreur API: ${res.status}</div>`; return; }
+      const json = await res.json();
+      lastDepartures = json.departures || [];
+      renderBoard(lastDepartures);
+    } catch(e) { console.error(e); boardBody.innerHTML = `<div class="no-data">Erreur de connexion</div>`; }
+  }
 
-// ====== Fetch departures ======
-async function fetchDepartures(stopId){
-  if(!stopId) return;
-  const now = new Date().toISOString().replace(/[-:]/g,"").split(".")[0];
-  const url = `https://api.sncf.com/v1/coverage/sncf/stop_areas/${encodeURIComponent(stopId)}/departures?datetime=${now}&count=200`;
-  try{
-    const res = await fetch(url,{headers:{Authorization:"Basic "+btoa(API_KEY+":")}});
-    if(!res.ok){boardBody.innerHTML=`<div class="no-data">Erreur API: ${res.status}</div>`; return;}
-    const json = await res.json();
-    lastDepartures = json.departures||[];
-    renderBoard(lastDepartures);
-  }catch(e){console.error(e); boardBody.innerHTML=`<div class="no-data">Erreur de connexion</div>`;}
-}
+  // ====== Рендер доски ======
+  function renderBoard(departures) {
+    const typeFilter = trainTypeSelect.value;
+    const delayedOnly = delayedOnlyCheckbox.checked;
+    const rows = [];
 
-// ====== Render board ======
-function renderBoard(deps){
-  const typeFilter = trainTypeSelect.value;
-  const delayedOnly = delayedOnlyCheckbox.checked;
-  const rows=[];
-  deps.forEach(dep=>{
-    const info=dep.display_informations||{};
-    const st=dep.stop_date_time||{};
-    const mission=escapeHtml(info.headsign||info.code||info.trip_short_name||"—");
-    const destination=escapeHtml(info.direction||(dep.terminus?.name)||"—");
-    const commercial=(info.commercial_mode||info.physical_mode||"").toString();
-    if(typeFilter!=="all" && !commercial.toUpperCase().includes(typeFilter.toUpperCase())) return;
+    departures.forEach(dep => {
+      const info = dep.display_informations || {};
+      const st = dep.stop_date_time || {};
+      const mission = info.headsign || info.code || info.trip_short_name || "—";
+      const line = info.code || (info.network && info.network.name) || "—";
 
-    const baseTs=st.base_departure_date_time||null;
-    const realTs=st.departure_date_time||null;
-    const delaySec=st.departure_delay||0;
-    const delayM = Math.floor(delaySec/60);
-    const canceled = st.cancelled || false;
-    const delayed = (!canceled) && ((baseTs&&realTs&&baseTs!==realTs)||(delayM>0));
+      const baseTs = st.base_departure_date_time || null;
+      const realTs = st.departure_date_time || null;
+      const delaySec = st.departure_delay || 0;
+      const delayMin = Math.floor((delaySec || 0) / 60);
 
-    if(delayedOnly && !delayed) return;
+      let delayed = false, canceled = info.canceled === true;
+      let originalDisplay = formatTimeFromNavitia(realTs);
+      let newDisplay = null;
 
-    let timeHTML="";
-    if(canceled){
-      timeHTML=`<span class="original-time" style="text-decoration:none;">supprimé</span>`;
-    } else if(delayed){
-      const orig=formatTime(baseTs||realTs);
-      const neu=addMinutes(baseTs||realTs,delayM)||formatTime(realTs||baseTs);
-      timeHTML=`<div class="time-with-delay"><span class="original-time">${orig}</span><span class="delayed-time">${neu}</span></div>`;
-    } else {
-      timeHTML=`<span class="on-time">${formatTime(realTs||baseTs)}</span>`;
-    }
+      if (!canceled && baseTs && realTs && baseTs !== realTs) {
+        delayed = true;
+        originalDisplay = formatTimeFromNavitia(baseTs);
+        newDisplay = formatTimeFromNavitia(realTs);
+      } else if (baseTs && delayMin > 0) {
+        delayed = true;
+        originalDisplay = formatTimeFromNavitia(baseTs);
+        newDisplay = addMinutesToNavitia(baseTs, delayMin);
+      }
 
-    // type + logo
-    let typeHTML=escapeHtml(commercial);
-    const logos={
-      TER:"ter.svg",RER:"rer.svg",TRANSILIEN:"transilien.svg",INTERCITÉS:"intercite.svg",TGV:"tgv.svg",Inoui:"inoui.svg",Ouigo:"ouigo.svg"
-    };
-    let logoFile=logos[commercial.toUpperCase()]||null;
-    if(logoFile) typeHTML=`<img src="logo/${logoFile}" alt="${commercial}" style="height:1.6rem;vertical-align:middle;margin-right:0.3rem;">${typeHTML}`;
-    if(commercial.toUpperCase()==="TER" && info.network) typeHTML+=` ${escapeHtml(info.network.name)}`;
+      const commercial = (info.commercial_mode || info.physical_mode || "").toString();
+      if (typeFilter !== 'all' && !commercial.toUpperCase().includes(typeFilter.toUpperCase())) return;
+      if (delayedOnly && !delayed) return;
 
-    rows.push({mission,destination,timeHTML,typeHTML,delayed,canceled});
+      const destination = escapeHtml(info.direction || (dep.terminus && dep.terminus.name) || "—");
+
+      rows.push({line, mission: escapeHtml(mission), destination, originalDisplay, newDisplay, delayed, canceled, trainType: commercial});
+    });
+
+    if (!rows.length) { boardBody.innerHTML = `<div class="no-data">Aucun départ après filtrage.</div>`; return; }
+
+    boardBody.innerHTML = rows.map((r,i) => {
+      const rowClass = (i%2===0) ? "train-row row-light" : "train-row row-dark";
+      let timeCell = r.canceled ? `<span class="original-time" style="color:red;text-decoration:line-through">${r.originalDisplay}</span> <span style="color:red;">supprimé</span>` :
+                     r.delayed ? `<div class="time-with-delay"><span class="original-time">${r.originalDisplay}</span><span class="delayed-time">${r.newDisplay}</span></div>` :
+                     `<span class="on-time">${r.originalDisplay}</span>`;
+
+      // логотипы
+      let logoHTML = '';
+      if (r.trainType.toUpperCase().includes('TER')) logoHTML = `<img src="logo/ter.svg" class="logo-type" />`;
+      else if (r.trainType.toUpperCase().includes('RER')) logoHTML = `<img src="logo/rer.svg" class="logo-type" />`;
+      else if (r.trainType.toUpperCase().includes('TGV INOUI')) logoHTML = `<img src="logo/inoui.svg" class="logo-type" />`;
+      else if (r.trainType.toUpperCase().includes('TGV OUIGO')) logoHTML = `<img src="logo/ouigo.svg" class="logo-type" />`;
+      else if (r.trainType.toUpperCase().includes('TRANSILIEN')) logoHTML = `<img src="logo/transilien.svg" class="logo-type" />`;
+      else if (r.trainType.toUpperCase().includes('INTERCITÉS')) logoHTML = `<img src="logo/intercite.svg" class="logo-type" />`;
+
+      return `<div class="${rowClass}">
+                <div class="col-line">${r.line}</div>
+                <div class="col-mission">${r.mission}</div>
+                <div class="col-destination">${r.destination}</div>
+                <div class="col-time">${timeCell}</div>
+                <div class="col-type">${logoHTML}${r.trainType}</div>
+              </div>`;
+    }).join('');
+  }
+
+  // ====== UI ======
+  let debounceTimer = null;
+  stationInput.addEventListener("input", e => {
+    const q = e.target.value.trim();
+    clearTimeout(debounceTimer);
+    suggestionsBox.innerHTML = ""; suggestionsBox.style.display="none";
+    if (!q || q.length < 2) return;
+    debounceTimer = setTimeout(async () => {
+      const res = await searchStations(q);
+      if (!res.length) { suggestionsBox.innerHTML=`<div class="suggestion-empty">Aucun résultat</div>`; suggestionsBox.style.display="block"; return; }
+      suggestionsBox.innerHTML = res.map(s => `<div class="suggestion-item" data-id="${s.id}">${escapeHtml(s.label)}</div>`).join('');
+      suggestionsBox.style.display="block";
+    }, 300);
   });
 
-  if(!rows.length){boardBody.innerHTML=`<div class="no-data">Aucun départ après filtrage.</div>`; return;}
+  suggestionsBox.addEventListener("click", ev => {
+    const el = ev.target.closest(".suggestion-item");
+    if (!el) return;
+    const id = el.dataset.id;
+    const label = el.textContent;
+    stationInput.value = label;
+    suggestionsBox.innerHTML = ""; suggestionsBox.style.display="none";
+    currentStation = { id, label };
+    fetchDepartures(id);
+  });
 
-  boardBody.innerHTML = rows.map((r,i)=>{
-    const rowClass = (i%2===0)?"train-row row-light":"train-row row-dark";
-    const styleCanceled=r.canceled?'color:red;text-decoration:line-through;':'';
-    return `<div class="${rowClass}" style="${styleCanceled}">
-      <div class="col-mission">${r.mission}</div>
-      <div class="col-destination">${r.destination}</div>
-      <div class="col-time">${r.timeHTML}</div>
-      <div class="col-type">${r.typeHTML}</div>
-    </div>`;
-  }).join("");
-}
+  trainTypeSelect.addEventListener("change", () => renderBoard(lastDepartures));
+  delayedOnlyCheckbox.addEventListener("change", () => renderBoard(lastDepartures));
+  refreshBtn.addEventListener("click", () => { if(currentStation) fetchDepartures(currentStation.id); });
+  setInterval(() => { if(currentStation) fetchDepartures(currentStation.id); }, 60000);
 
-// ====== UI handlers ======
-let debounceTimer=null;
-stationInput.addEventListener("input",(e)=>{
-  const q=e.target.value.trim();
-  clearTimeout(debounceTimer);
-  suggestionsBox.innerHTML=""; suggestionsBox.style.display="none";
-  if(!q||q.length<2) return;
-  debounceTimer=setTimeout(async()=>{
-    const res = await searchStations(q);
-    if(!res.length){suggestionsBox.innerHTML=`<div class="suggestion-empty">Aucun résultat</div>`; suggestionsBox.style.display="block"; return;}
-    suggestionsBox.innerHTML=res.map(s=>`<div class="suggestion-item" data-id="${s.id}">${escapeHtml(s.label)}</div>`).join("");
-    suggestionsBox.style.display="block";
-  },300);
-});
-
-suggestionsBox.addEventListener("click",(ev)=>{
-  const el = ev.target.closest(".suggestion-item");
-  if(!el) return;
-  const id = el.dataset.id;
-  stationInput.value = el.textContent;
-  suggestionsBox.innerHTML=""; suggestionsBox.style.display="none";
-  currentStation={id,label:el.textContent};
-  fetchDepartures(id);
-});
-
-trainTypeSelect.addEventListener("change",()=>renderBoard(lastDepartures));
-delayedOnlyCheckbox.addEventListener("change",()=>renderBoard(lastDepartures));
-refreshBtn.addEventListener("click",()=>{if(currentStation?.id) fetchDepartures(currentStation.id);});
-
-setInterval(()=>{if(currentStation?.id) fetchDepartures(currentStation.id);},60000);
-</script>
+  </script>
 </body>
 </html>
