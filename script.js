@@ -204,7 +204,7 @@ function handleRowClick(event) {
     if (tripId) {
         // Кодируем только специальные символы, но сохраняем читаемость
         const cleanTripId = tripId.replace(/:/g, '-').replace(/\//g, '_');
-        window.location.href = `trip.html?${cleanTripId}`;
+        window.location.href = `trip?${cleanTripId}`;
     }
 }
 
