@@ -185,3 +185,5 @@ trainTypeSelect.addEventListener("change", () => {
     renderBoard(lastDepartures);
   }
 });
+
+
