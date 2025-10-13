@@ -9,7 +9,6 @@ body {
   overflow-x: hidden;
 }
 
-/* App wrapper */
 .App { min-height: 100vh; background: #002855; }
 
 /* Header */
@@ -24,10 +23,8 @@ body {
 .sncf-logo { font-size: 2rem; font-weight: 900; letter-spacing: 1px; padding: 0.4rem 1.2rem; background: white; color: #002855; border-radius: 2px; font-family: 'Parisine Std', sans-serif; }
 .header-title { font-size: 1.6rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #fff; }
 
-/* Container */
 .container { max-width: 1200px; margin: 1.5rem auto; padding: 1.2rem; }
 
-/* Search section */
 .search-section {
   background: rgba(0,40,85,0.12);
   padding: 1rem;
@@ -48,7 +45,6 @@ body {
 }
 .search-input:focus { outline: none; border-color: #fff; }
 
-/* Suggestions */
 .suggestions {
   position: absolute;
   top: calc(100% + 0.6rem);
@@ -74,11 +70,10 @@ body {
 .suggestion-item:hover { background: #e6f0ff; }
 .suggestion-empty { padding:0.8rem; color:#666; }
 
-/* Board */
 .board { margin-top: 1rem; border-radius:6px; overflow:hidden; border: 1px solid rgba(255,255,255,0.06); }
 .board-header {
   display: grid;
-  grid-template-columns: 1fr 1fr 180px 120px;
+  grid-template-columns: 80px 120px 1fr 180px 140px;
   gap: 1rem;
   padding: 0.9rem 1rem;
   font-weight:900;
@@ -91,16 +86,16 @@ body {
 }
 .board-body { padding: 0; }
 
-/* Rows (alternating) */
-.train-row { display: grid; grid-template-columns: 1fr 1fr 180px 120px; gap:1rem; padding: 0.85rem 1rem; align-items:center; transition: filter 0.12s; color: #fff; font-family:'Parisine Std',sans-serif; }
+.train-row { display: grid; grid-template-columns: 80px 120px 1fr 180px 140px; gap:1rem; padding: 0.85rem 1rem; align-items:center; transition: filter 0.12s; color: #fff; font-family:'Parisine Std',sans-serif; }
 .train-row:hover { filter: brightness(1.05); }
 
-/* alternating blue colors */
-.row-light { background: #003875; }  /* lighter */
-.row-dark { background: #0052a3; }   /* darker */
+.row-light { background: #003875; }
+.row-dark { background: #0052a3; }
 
-/* Column styles */
-.col-mission { font-weight:800; font-size:0.98rem; display:flex; align-items:center; gap:0.4rem; }
+/* Columns */
+.col-line { display:flex; align-items:center; gap:0.6rem; }
+.line-badge { display:inline-flex; align-items:center; justify-content:center; padding:0.4rem 0.6rem; border-radius:6px; color:white; font-weight:900; min-width:46px; text-align:center; border: 2px solid rgba(255,255,255,0.12); }
+.col-mission { font-weight:800; font-size:0.98rem; }
 .col-destination { font-weight:700; font-size:0.98rem; }
 .col-time { font-weight:900; font-size:1.02rem; }
 .time-with-delay { display:flex; align-items:center; gap:0.8rem; justify-content:flex-start; }
@@ -108,12 +103,10 @@ body {
 .delayed-time { color:#ffd700; font-weight:900; font-size:1.1rem; background: rgba(0,0,0,0.05); padding:0.05rem 0.5rem; border-radius:4px; }
 .on-time { color:#fff; font-weight:900; }
 .col-type { font-weight:700; opacity:0.95; text-transform:capitalize; display:flex; align-items:center; gap:0.3rem; }
-.col-type img { height:1.6rem; vertical-align:middle; }
+.logo-type { width:28px; height:28px; object-fit:contain; border-radius:4px; background:white; padding:2px; }
 
-/* no-data */
 .no-data { text-align:center; padding:2rem; color: rgba(255,255,255,0.85); font-weight:700; }
 
-/* Refresh button */
 .refresh-btn {
   background: rgba(255,255,255,0.08);
   color: white;
@@ -125,15 +118,10 @@ body {
 }
 .refresh-btn:hover { background: rgba(255,255,255,0.12); }
 
-/* Canceled trains */
-.train-row[style*="line-through"] .col-time span { color:red; text-decoration:line-through; }
-.train-row[style*="line-through"] .col-type img { opacity:0.5; }
-
-/* Responsive */
 @media (max-width: 920px) {
-  .board-header, .train-row { grid-template-columns: 1fr 1fr 140px 100px; gap:0.5rem; }
+  .board-header, .train-row { grid-template-columns: 70px 100px 1fr 150px 120px; gap:0.5rem; }
 }
 @media (max-width: 640px) {
-  .board-header, .train-row { grid-template-columns: 1fr 1fr 1fr 1fr; grid-auto-flow: row; }
+  .board-header, .train-row { grid-template-columns: 60px 90px 1fr 120px; grid-auto-flow: row; }
   .col-type { display:none; }
 }
