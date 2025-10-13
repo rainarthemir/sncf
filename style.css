@@ -213,29 +213,16 @@ body {
   }
 }
 
+/* Добавьте эти стили в существующий CSS */
+
 .clickable-train-row {
     cursor: pointer !important;
     position: relative;
-}
-
-.clickable-train-row::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: transparent;
-    transition: background-color 0.2s ease;
-    pointer-events: none;
-}
-
-.clickable-train-row:hover::after {
-    background: rgba(255, 215, 0, 0.1);
+    transition: all 0.2s ease;
 }
 
 .clickable-train-row:hover {
-    background: rgba(255, 255, 255, 0.12) !important;
+    background: rgba(255, 255, 255, 0.15) !important;
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
     border-left: 4px solid #ffd700;
@@ -246,3 +233,13 @@ body {
     transition: transform 0.1s ease;
 }
 
+/* Убедимся, что остальные стили для строк остаются */
+.train-row {
+    display: grid;
+    grid-template-columns: 100px 140px 1fr 220px 160px;
+    gap: 1rem;
+    padding: 0.85rem 1rem;
+    align-items: center;
+}
+.row-light { background: #003875; }
+.row-dark { background: #0052a3; }
