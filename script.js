@@ -5,7 +5,6 @@ const boardBody = document.getElementById("board-body");
 const trainTypeSelect = document.getElementById("trainType");
 const refreshBtn = document.getElementById("refreshBtn");
 
-
 let currentStation = null;
 let lastDepartures = [];
 
@@ -71,6 +70,7 @@ function renderBoard(departures){
     const destination=escapeHtml(info.direction||(dep.terminus&&dep.terminus.name)||"—");
     const color=info.color?("#"+info.color):"#0052a3";
     const canceled=info.status && info.status.toLowerCase().includes("cancelled");
+    const tripId = dep.links?.find(link => link.type === "trip")?.id || null;
 
     let logoHtml="", textHtml="";
     if(trainType.toUpperCase().includes("TER")){ logoHtml='<img src="logo/ter.svg" class="train-logo" alt="TER">'; textHtml='<span class="train-logo-text">HDF</span>'; }
@@ -81,7 +81,20 @@ function renderBoard(departures){
     else if(trainType.toUpperCase().includes("TRANS")){ logoHtml='<img src="logo/transilien.svg" class="train-logo" alt="Transilien">'; textHtml='Transilien';}
     else{ textHtml=escapeHtml(trainType);}
 
-    rows.push({line: lineDisplay, lineEsc: escapeHtml(lineDisplay), missionEsc, destination, originalDisplay, newDisplay, delayed, color, logoHtml, textHtml, canceled});
+    rows.push({
+      line: lineDisplay, 
+      lineEsc: escapeHtml(lineDisplay), 
+      missionEsc, 
+      destination, 
+      originalDisplay, 
+      newDisplay, 
+      delayed, 
+      color, 
+      logoHtml, 
+      textHtml, 
+      canceled,
+      tripId
+    });
   });
 
   if(!rows.length){ 
@@ -95,7 +108,11 @@ function renderBoard(departures){
       r.delayed?`<span class="original-time">${r.originalDisplay}</span><span class="delayed-time">${r.newDisplay}</span>`:
       `<span class="on-time">${r.originalDisplay}</span>`;
     const typeCell=r.logoHtml ? `<div class="col-type">${r.logoHtml} ${r.textHtml}</div>`:`<div class="col-type">${r.textHtml}</div>`;
-    return `<div class="${rowClass}">
+    
+    // Add clickable row with trip ID
+    const clickableAttr = r.tripId ? `data-trip-id="${r.tripId}" style="cursor: pointer;"` : '';
+    
+    return `<div class="${rowClass}" ${clickableAttr}>
       <div class="col-line"><span class="line-badge" style="background-color:${r.color}">${r.lineEsc}</span></div>
       <div class="col-mission">${r.missionEsc}</div>
       <div class="col-destination">${r.destination}</div>
@@ -103,6 +120,14 @@ function renderBoard(departures){
       ${typeCell}
     </div>`;
   }).join("\n");
+
+  // Add click event listeners to trip rows
+  document.querySelectorAll('.train-row[data-trip-id]').forEach(row => {
+    row.addEventListener('click', () => {
+      const tripId = row.getAttribute('data-trip-id');
+      window.location.href = `https://rainarthemir.github.io/sncf/trip?${tripId}`;
+    });
+  });
 }
 
 stationInput.addEventListener("input",async(e)=>{
