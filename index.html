@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SNCF — Départs</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="App departures-mode">
+    <header class="sncf-header departures-mode">
+      <div class="header-content">
+        <div class="sncf-logo">SNCF</div>
+        <div class="header-title">Départs</div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="search-section">
+        <label class="search-label" for="stationSearch">Rechercher une gare</label>
+        <div class="search-wrapper">
+          <input id="stationSearch" class="search-input" type="search" placeholder="Ex: Paris Montparnasse" autocomplete="off" />
+          <div id="suggestions" class="suggestions" role="listbox" aria-hidden="true"></div>
+        </div>
+
+        <div class="filters" style="margin-top: 1rem;">
+          <div>
+            <label for="trainType" style="color:#fff;font-weight:700">Type de train</label><br />
+            <select id="trainType" style="padding:0.6rem;border-radius:4px;margin-top:0.3rem;">
+              <option value="all">Tous</option>
+              <option value="TER">TER</option>
+              <option value="TGV">TGV</option>
+              <option value="TRANSILIEN">Transilien</option>
+              <option value="INTERCITÉS">Intercités</option>
+              <option value="RER">RER</option>
+            </select>
+          </div>
+
+          <div style="align-self:center;">
+            <label style="color:#fff;font-weight:700">
+              <input id="delayedOnly" type="checkbox" /> Seulement en retard
+            </label>
+          </div>
+
+          <div style="margin-left:auto; align-self:center;">
+            <button id="refreshBtn" class="refresh-btn">Actualiser</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="board-section">
+        <div class="board">
+          <div class="board-header">
+            <div class="col-line">LIGNE</div>
+            <div class="col-mission">MISSION</div>
+            <div class="col-destination">DESTINATION</div>
+            <div class="col-time">HEURE</div>
+            <div class="col-delay">DÉLAI</div>
+            <div class="col-type">TYPE</div>
+            <div class="col-platform">VOIE</div>
+          </div>
+
+          <div id="board-body" class="board-body">
+            <div class="no-data">Tapez une gare pour commencer (ex. « Paris Montparnasse »)</div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    // ====== Конфиг ======
+    const API_KEY = "e41a2be9-7450-4f1a-a7e6-eb429950186f";
+    const stationInput = document.getElementById("stationSearch");
+    const suggestionsBox = document.getElementById("suggestions");
+    const boardBody = document.getElementById("board-body");
+    const trainTypeSelect = document.getElementById("trainType");
+    const delayedOnlyCheckbox = document.getElementById("delayedOnly");
+    const refreshBtn = document.getElementById("refreshBtn");
+
+    let currentStation = null;
+    let lastDepartures = [];
+
+    // ====== Утилиты ======
+    function escapeHtml(s = "") {
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+    }
+
+    function formatTimeFromNavitia(ts) {
+      // navitia timestamp like 20251013T151200
+      if (!ts || ts.length < 13) return "—";
+      const hhmm = ts.slice(9, 13);
+      return hhmm.slice(0, 2) + "h" + hhmm.slice(2);
+    }
+
+    // ====== Поиск станций (places?q=...&type[]=stop_area&count=50) ======
+    async function searchStations(q) {
+      if (!q || q.trim().length < 2) return [];
+      const url = `https://api.sncf.com/v1/coverage/sncf/places?q=${encodeURIComponent(q)}&type[]=stop_area&count=50`;
+      try {
+        const res = await fetch(url, {
+          headers: { Authorization: "Basic " + btoa(API_KEY + ":") }
+        });
+        if (!res.ok) return [];
+        const json = await res.json();
+        return (json.places || []).map(p => ({
+          id: p.id,
+          label: p.stop_area?.label || p.name || p.id
+        }));
+      } catch (e) {
+        console.error("searchStations error", e);
+        return [];
+      }
+    }
+
+    // ====== Получение отправлений ======
+    async function fetchDepartures(stopId) {
+      if (!stopId) return;
+      const now = new Date().toISOString().replace(/[-:]/g,"").split(".")[0]; // 20251013T151200
+      const url = `https://api.sncf.com/v1/coverage/sncf/stop_areas/${encodeURIComponent(stopId)}/departures?datetime=${now}&count=50`;
+      try {
+        const res = await fetch(url, {
+          headers: { Authorization: "Basic " + btoa(API_KEY + ":") }
+        });
+        if (!res.ok) {
+          boardBody.innerHTML = `<div class="no-data">Erreur API: ${res.status}</div>`;
+          return;
+        }
+        const json = await res.json();
+        lastDepartures = json.departures || [];
+        renderBoard(lastDepartures);
+      } catch (e) {
+        console.error("fetchDepartures error", e);
+        boardBody.innerHTML = `<div class="no-data">Erreur de connexion</div>`;
+      }
+    }
+
+    // Отображать ряд таблицы — с учётом миссии справа от линии
+    function renderBoard(departures) {
+      const typeFilter = trainTypeSelect.value;
+      const delayedOnly = delayedOnlyCheckbox.checked;
+      const rows = [];
+
+      departures.forEach((dep, idx) => {
+        const info = dep.display_informations || {};
+        const st = dep.stop_date_time || {};
+        // mission: headsign (код миссии) или code или trip_short_name (номер), fallback name
+        const mission =
+          info.headsign || info.code || info.trip_short_name || info.name || info.label || "—";
+
+        // line (короткий код/номер линии)
+        const line = info.code || (info.network && info.network.name) || (info.name || "?");
+
+        const scheduled = st.base_departure_date_time || st.departure_date_time || "";
+        const real = st.departure_date_time || scheduled;
+        const scheduledFmt = formatTimeFromNavitia(scheduled);
+        const realFmt = formatTimeFromNavitia(real);
+        const delaySeconds = st.departure_delay || 0;
+        const delayMinutes = Math.floor(delaySeconds / 60);
+
+        // type detection (commercial_mode)
+        const commercial = (info.commercial_mode || info.physical_mode || "").toString();
+        const trainType = commercial || "Autre";
+
+        // filters
+        const matchType = typeFilter === "all" || (commercial && commercial.toUpperCase().includes(typeFilter.toUpperCase()));
+        const matchDelay = !delayedOnly || delayMinutes > 0;
+        if (!matchType || !matchDelay) return;
+
+        const missionEsc = escapeHtml(mission);
+        const destination = escapeHtml(info.direction || (dep.terminus && dep.terminus.name) || "—");
+        const lineEsc = escapeHtml(line);
+        const color = info.color ? ("#" + info.color) : "#0052a3";
+        const platform = st.stop_point ? escapeHtml(st.stop_point.name || "") : "";
+
+        rows.push({
+          line: lineEsc,
+          mission: missionEsc,
+          destination,
+          scheduled: scheduledFmt,
+          real: realFmt,
+          delayMinutes,
+          color,
+          trainType: escapeHtml(trainType),
+          platform
+        });
+      });
+
+      if (!rows.length) {
+        boardBody.innerHTML = `<div class="no-data">Aucun départ après filtrage.</div>`;
+        return;
+      }
+
+      // Build HTML: alternate row colors: row-light / row-dark
+      boardBody.innerHTML = rows.map((r, i) => {
+        const rowClass = (i % 2 === 0) ? "train-row row-light" : "train-row row-dark";
+        const delayCell = r.delayMinutes > 0
+                          ? `<div class="time-with-delay"><span class="original-time">${r.scheduled}</span><span class="delayed-time">${r.real}</span></div>`
+                          : `<span class="on-time">${r.scheduled}</span>`;
+        return `
+          <div class="${rowClass}">
+            <div class="col-line">
+              <span class="line-badge" style="background:${r.color}">${r.line}</span>
+            </div>
+
+            <div class="col-mission">
+              ${r.mission}
+            </div>
+
+            <div class="col-destination">${r.destination}</div>
+
+            <div class="col-time">${delayCell}</div>
+
+            <div class="col-delay">${r.delayMinutes > 0 ? (r.delayMinutes + " min") : "–"}</div>
+
+            <div class="col-type">${r.trainType}</div>
+
+            <div class="col-platform">${r.platform || "–"}</div>
+          </div>
+        `;
+      }).join("");
+
+    }
+
+    // ====== Обработчики UI ======
+    let debounceTimer = null;
+    stationInput.addEventListener("input", (e) => {
+      const q = e.target.value.trim();
+      clearTimeout(debounceTimer);
+      suggestionsBox.innerHTML = "";
+      suggestionsBox.style.display = "none";
+      if (!q || q.length < 2) return;
+      debounceTimer = setTimeout(async () => {
+        const res = await searchStations(q);
+        if (!res.length) {
+          suggestionsBox.innerHTML = `<div class="suggestion-empty">Aucun résultat</div>`;
+          suggestionsBox.style.display = "block";
+          return;
+        }
+        suggestionsBox.innerHTML = res.map(s => `<div class="suggestion-item" data-id="${s.id}">${escapeHtml(s.label)}</div>`).join("");
+        suggestionsBox.style.display = "block";
+      }, 300);
+    });
+
+    suggestionsBox.addEventListener("click", (ev) => {
+      const el = ev.target.closest(".suggestion-item");
+      if (!el) return;
+      const id = el.dataset.id;
+      const label = el.textContent;
+      stationInput.value = label;
+      suggestionsBox.innerHTML = "";
+      suggestionsBox.style.display = "none";
+      currentStation = { id, label };
+      fetchDepartures(id);
+    });
+
+    // Filters + refresh
+    trainTypeSelect.addEventListener("change", () => renderBoard(lastDepartures));
+    delayedOnlyCheckbox.addEventListener("change", () => renderBoard(lastDepartures));
+    refreshBtn.addEventListener("click", () => {
+      if (currentStation && currentStation.id) fetchDepartures(currentStation.id);
+    });
+
+    // Auto-refresh every 60s if station selected
+    setInterval(() => {
+      if (currentStation && currentStation.id) fetchDepartures(currentStation.id);
+    }, 60000);
+  </script>
+</body>
+</html>
