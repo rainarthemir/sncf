@@ -103,6 +103,10 @@ body {
 .col-line { display:flex; align-items:center; gap:0.6rem; }
 .line-badge { display:inline-flex; align-items:center; justify-content:center; padding:0.4rem 0.6rem; border-radius:6px; color:white; font-weight:900; min-width:46px; text-align:center; border: 2px solid rgba(255,255,255,0.12); }
 
+/* добавим цвет линии фоном */
+.line-badge[data-color] { background-color: attr(data-color color, #0052a3); }
+
+/* Mission / Destination / Time */
 .col-mission { font-weight:800; font-size:0.98rem; }
 .col-destination { font-weight:700; font-size:0.98rem; }
 .col-time { font-weight:900; font-size:1.02rem; }
@@ -115,10 +119,13 @@ body {
 .canceled-time { color:#ff4d4d; text-decoration:line-through; font-weight:900; }
 .canceled-text { color:#ff4d4d; font-weight:900; margin-left:0.5rem; }
 
-/* train type column */
+/* train type column + логотипы */
 .col-type { font-weight:700; opacity:0.95; text-transform:capitalize; display:flex; align-items:center; gap:0.4rem; }
-.train-logo { height:24px; width:auto; }
+.train-logo { height:16px; width:auto; } /* уменьшили до прежнего размера */
 .train-logo-text { font-size:0.85rem; color:#fff; font-weight:700; }
+
+/* для RER и Transilien фон белый под логотип */
+.train-logo.rer, .train-logo.transilien { background:white; padding:2px; border-radius:2px; }
 
 /* no-data */
 .no-data { text-align:center; padding:2rem; color: rgba(255,255,255,0.85); font-weight:700; }
@@ -152,6 +159,6 @@ body {
     grid-auto-flow: row;
   }
   .col-type { font-size:0.8rem; } 
-  .train-logo { height:20px; }
+  .train-logo { height:16px; }
   .train-logo-text { font-size:0.75rem; }
 }
