@@ -5,6 +5,7 @@ const boardBody = document.getElementById("board-body");
 const trainTypeSelect = document.getElementById("trainType");
 const refreshBtn = document.getElementById("refreshBtn");
 
+
 let currentStation = null;
 let lastDepartures = [];
 
