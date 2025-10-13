@@ -2,7 +2,7 @@ const API_KEY = "e41a2be9-7450-4f1a-a7e6-eb429950186f";
 
 // Get trip ID from URL
 const urlParams = new URLSearchParams(window.location.search);
-const tripId = Array.from(urlParams.keys())[0]; // Get first parameter
+const tripId = urlParams.get('id');
 
 // DOM elements
 const tripNumberElement = document.getElementById('tripNumber');
@@ -336,3 +336,4 @@ if (tripId) {
 } else {
     showError('Aucun identifiant de trajet spécifié');
 }
+
