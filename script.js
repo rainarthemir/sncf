@@ -84,19 +84,21 @@ function renderBoard(departures) {
         const info = dep.display_informations || {};
         const st = dep.stop_date_time || {};
         
-        // Trip ID extraction - более надежное получение tripId
+        // CORRECTED: Get the real trip ID from the API
         let tripId = null;
-        if (dep.links) {
+        
+        // Method 1: From trip object
+        if (dep.trip && dep.trip.id) {
+            tripId = dep.trip.id;
+        }
+        // Method 2: From links array
+        else if (dep.links) {
             const tripLink = dep.links.find(link => link.type === "trip");
             tripId = tripLink ? tripLink.id : null;
         }
-        if (!tripId && dep.trip) {
-            tripId = dep.trip.id;
-        }
-        // Если все еще нет tripId, попробуем найти в других местах
-        if (!tripId && info.trip_short_name) {
-            tripId = info.trip_short_name;
-        }
+        
+        console.log("Departure:", dep); // Debug log to see the structure
+        console.log("Extracted tripId:", tripId); // Debug log
 
         const mission = info.headsign || info.code || info.trip_short_name || info.name || info.label || "—";
         const line = info.code || "?";
@@ -168,7 +170,7 @@ function renderBoard(departures) {
         const rowClass = index % 2 === 0 ? "train-row row-light" : "train-row row-dark";
         const clickableClass = tripId ? "clickable-train-row" : "";
 
-        // ВАЖНО: Добавляем data-trip-id только если tripId существует
+        // Add data-trip-id only if tripId exists
         const tripIdAttr = tripId ? `data-trip-id="${tripId}"` : '';
 
         return `
@@ -182,30 +184,41 @@ function renderBoard(departures) {
         `;
     }).join("");
 
-    // Добавляем обработчики событий для кликабельных строк
-    addClickHandlers();
-}
-
-// Функция для добавления обработчиков клика
-function addClickHandlers() {
-    const clickableRows = document.querySelectorAll('.clickable-train-row');
-    
-    clickableRows.forEach(row => {
-        // Удаляем существующие обработчики чтобы избежать дублирования
-        row.removeEventListener('click', handleRowClick);
-        // Добавляем новый обработчик
-        row.addEventListener('click', handleRowClick);
+    // Add click event listeners using event delegation
+    boardBody.addEventListener('click', (event) => {
+        const row = event.target.closest('.clickable-train-row');
+        if (row) {
+            const tripId = row.getAttribute('data-trip-id');
+            if (tripId) {
+                // FIXED: Use 'trip' instead of 'trip.html' and clean the tripId
+                const cleanTripId = tripId
+                    .replace(/:/g, '-')
+                    .replace(/\//g, '_')
+                    .replace(/\?/g, '--')
+                    .replace(/=/g, '---')
+                    .replace(/&/g, '____');
+                
+                window.location.href = `trip?${cleanTripId}`;
+            }
+        }
     });
-}
 
-// Обработчик клика по строке
-function handleRowClick(event) {
-    const tripId = this.getAttribute('data-trip-id');
-    if (tripId) {
-        // Кодируем только специальные символы, но сохраняем читаемость
-        const cleanTripId = tripId.replace(/:/g, '-').replace(/\//g, '_');
-        window.location.href = `trip?${cleanTripId}`;
-    }
+    // Also add individual handlers for better mobile support
+    document.querySelectorAll('.clickable-train-row').forEach(row => {
+        row.addEventListener('click', function(e) {
+            const tripId = this.getAttribute('data-trip-id');
+            if (tripId) {
+                const cleanTripId = tripId
+                    .replace(/:/g, '-')
+                    .replace(/\//g, '_')
+                    .replace(/\?/g, '--')
+                    .replace(/=/g, '---')
+                    .replace(/&/g, '____');
+                
+                window.location.href = `trip?${cleanTripId}`;
+            }
+        });
+    });
 }
 
 // Event listeners
@@ -241,9 +254,4 @@ trainTypeSelect.addEventListener("change", () => {
     if (lastDepartures.length > 0) {
         renderBoard(lastDepartures);
     }
-});
-
-// Инициализация при загрузке страницы
-document.addEventListener('DOMContentLoaded', function() {
-    // Можно добавить начальную загрузку если нужно
 });
