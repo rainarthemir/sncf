@@ -93,9 +93,29 @@ body {
   gap: 1rem;
   padding: 0.85rem 1rem;
   align-items: center;
+  transition: all 0.2s ease;
+  cursor: default;
 }
 .row-light { background: #003875; }
 .row-dark { background: #0052a3; }
+
+/* Clickable rows with hover effect */
+.clickable-train-row {
+  cursor: pointer !important;
+  transition: all 0.3s ease;
+}
+
+.clickable-train-row:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border-left: 4px solid #ffd700;
+}
+
+.clickable-train-row:active {
+  transform: translateY(0);
+  transition: transform 0.1s ease;
+}
 
 .col-line { display: flex; align-items: center; gap: 0.5rem; }
 .line-badge {
@@ -107,6 +127,11 @@ body {
   color: white;
   font-weight: 900;
   min-width: 46px;
+  transition: transform 0.2s ease;
+}
+
+.clickable-train-row:hover .line-badge {
+  transform: scale(1.05);
 }
 
 .col-mission { font-weight: 800; }
@@ -146,4 +171,9 @@ body {
   .col-line, .col-time, .col-type { font-size: 0.75rem; }
   .sncf-logo { font-size: 1.4rem; }
   .header-title { font-size: 1.1rem; }
+  
+  .clickable-train-row:hover {
+    transform: none;
+    border-left: 2px solid #ffd700;
+  }
 }
