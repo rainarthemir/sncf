@@ -212,3 +212,37 @@ body {
     border-left: 2px solid #ffd700;
   }
 }
+
+.clickable-train-row {
+    cursor: pointer !important;
+    position: relative;
+}
+
+.clickable-train-row::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: transparent;
+    transition: background-color 0.2s ease;
+    pointer-events: none;
+}
+
+.clickable-train-row:hover::after {
+    background: rgba(255, 215, 0, 0.1);
+}
+
+.clickable-train-row:hover {
+    background: rgba(255, 255, 255, 0.12) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    border-left: 4px solid #ffd700;
+}
+
+.clickable-train-row:active {
+    transform: translateY(0);
+    transition: transform 0.1s ease;
+}
+
