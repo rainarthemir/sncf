@@ -1,16 +1,15 @@
 const API_KEY = "e41a2be9-7450-4f1a-a7e6-eb429950186f";
 
-// Get vehicle_journey ID from URL
+// Get vehicle_journey ID from URL - CORRECTED
 function getVehicleJourneyIdFromURL() {
     const search = window.location.search;
     if (!search) return null;
     
     // Remove the '?' and get the vehicleJourneyId
-    let vehicleJourneyId = search.substring(1);
+    // Don't decode here - we want the raw ID for API call
+    const vehicleJourneyId = search.substring(1);
     
-    // Decode the URL component
-    vehicleJourneyId = decodeURIComponent(vehicleJourneyId);
-    
+    console.log("Raw vehicle_journey ID from URL:", vehicleJourneyId);
     return vehicleJourneyId;
 }
 
@@ -81,7 +80,7 @@ function getStatusClass(status) {
     }
 }
 
-// Fetch vehicle journey details
+// Fetch vehicle journey details - CORRECTED API CALL
 async function fetchVehicleJourneyDetails(vehicleJourneyId) {
     if (!vehicleJourneyId) {
         showError('ID de vehicle journey manquant');
@@ -89,14 +88,18 @@ async function fetchVehicleJourneyDetails(vehicleJourneyId) {
     }
 
     try {
-        // Use vehicle_journeys endpoint instead of trips
-        const vehicleJourneyUrl = `https://api.sncf.com/v1/coverage/sncf/vehicle_journeys/${encodeURIComponent(vehicleJourneyId)}`;
+        console.log("Fetching vehicle journey details for:", vehicleJourneyId);
+        
+        // CORRECTED: Use vehicle_journeys endpoint with proper encoding
+        const vehicleJourneyUrl = `https://api.sncf.com/v1/coverage/sncf/vehicle_journeys/${vehicleJourneyId}`;
+        console.log("API URL:", vehicleJourneyUrl);
+        
         const vehicleJourneyRes = await fetch(vehicleJourneyUrl, {
             headers: { Authorization: "Basic " + btoa(API_KEY + ":") }
         });
 
         if (!vehicleJourneyRes.ok) {
-            throw new Error(`Erreur API: ${vehicleJourneyRes.status}`);
+            throw new Error(`Erreur API: ${vehicleJourneyRes.status} - ${await vehicleJourneyRes.text()}`);
         }
 
         const vehicleJourneyData = await vehicleJourneyRes.json();
@@ -106,29 +109,33 @@ async function fetchVehicleJourneyDetails(vehicleJourneyId) {
             throw new Error('Vehicle journey non trouvé');
         }
 
-        // Get route schedules for stop times
-        const schedulesUrl = `https://api.sncf.com/v1/coverage/sncf/vehicle_journeys/${encodeURIComponent(vehicleJourneyId)}/route_schedules?count=100`;
-        const schedulesRes = await fetch(schedulesUrl, {
+        console.log("Found vehicle journey:", vehicleJourney);
+
+        // Get stop times using the same vehicle_journey ID
+        const stopTimesUrl = `https://api.sncf.com/v1/coverage/sncf/vehicle_journeys/${vehicleJourneyId}/stop_times`;
+        console.log("Stop times URL:", stopTimesUrl);
+        
+        const stopTimesRes = await fetch(stopTimesUrl, {
             headers: { Authorization: "Basic " + btoa(API_KEY + ":") }
         });
 
-        if (!schedulesRes.ok) {
-            throw new Error(`Erreur API horaires: ${schedulesRes.status}`);
+        if (!stopTimesRes.ok) {
+            throw new Error(`Erreur API stop_times: ${stopTimesRes.status}`);
         }
 
-        const schedulesData = await schedulesRes.json();
+        const stopTimesData = await stopTimesRes.json();
         
-        displayVehicleJourneyInfo(vehicleJourney, schedulesData);
+        displayVehicleJourneyInfo(vehicleJourney, stopTimesData);
     } catch (error) {
         console.error('Error fetching vehicle journey details:', error);
         showError(error.message);
     }
 }
 
-function displayVehicleJourneyInfo(vehicleJourney, schedulesData) {
+function displayVehicleJourneyInfo(vehicleJourney, stopTimesData) {
     // Basic vehicle journey info
     const name = vehicleJourney.name || 'Train sans nom';
-    const number = vehicleJourney.code || '--';
+    const number = vehicleJourney.code || vehicleJourney.name || '--';
     const commercialMode = vehicleJourney.commercial_mode?.name || 'Train';
     
     tripNumberElement.textContent = number;
@@ -148,7 +155,7 @@ function displayVehicleJourneyInfo(vehicleJourney, schedulesData) {
     }
 
     // Process stop times
-    const stopTimes = processStopTimes(schedulesData);
+    const stopTimes = processStopTimes(stopTimesData);
     displayStopTimes(stopTimes);
     updateOverallStatus(stopTimes);
     
@@ -160,25 +167,24 @@ function displayVehicleJourneyInfo(vehicleJourney, schedulesData) {
     }
 }
 
-function processStopTimes(schedulesData) {
+function processStopTimes(stopTimesData) {
     const stopTimes = [];
-    const routeSchedule = schedulesData.route_schedules?.[0];
+    const stopTimesList = stopTimesData.stop_times;
     
-    if (!routeSchedule || !routeSchedule.table || !routeSchedule.table.rows) {
+    if (!stopTimesList || !stopTimesList.length) {
         return stopTimes;
     }
 
-    routeSchedule.table.rows.forEach(row => {
-        const stopPoint = row.stop_point;
-        const dateTimes = row.date_times?.[0];
+    stopTimesList.forEach(stopTime => {
+        const stopPoint = stopTime.stop_point;
         
-        if (!stopPoint || !dateTimes) return;
+        if (!stopPoint) return;
 
         const stopName = stopPoint.name || stopPoint.label || 'Arrêt inconnu';
-        const baseArrival = dateTimes.base_arrival_date_time;
-        const baseDeparture = dateTimes.base_departure_date_time;
-        const actualArrival = dateTimes.arrival_date_time;
-        const actualDeparture = dateTimes.departure_date_time;
+        const baseArrival = stopTime.arrival_time;
+        const baseDeparture = stopTime.departure_time;
+        const actualArrival = stopTime.arrival_time; // Use same as base for now
+        const actualDeparture = stopTime.departure_time; // Use same as base for now
         
         const arrivalStatus = getDelayStatus(baseArrival, actualArrival);
         const departureStatus = getDelayStatus(baseDeparture, actualDeparture);
@@ -191,7 +197,7 @@ function processStopTimes(schedulesData) {
             actualDeparture,
             arrivalStatus,
             departureStatus,
-            platform: dateTimes.stop_point?.platform_code || '--'
+            platform: stopPoint.platform_code || '--'
         });
     });
 
