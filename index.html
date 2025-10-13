@@ -55,9 +55,7 @@
             <div class="col-mission">MISSION</div>
             <div class="col-destination">DESTINATION</div>
             <div class="col-time">HEURE</div>
-            <div class="col-delay">DÉLAI</div>
             <div class="col-type">TYPE</div>
-            <div class="col-platform">VOIE</div>
           </div>
 
           <div id="board-body" class="board-body">
@@ -93,6 +91,26 @@
       return hhmm.slice(0, 2) + "h" + hhmm.slice(2);
     }
 
+    function parseHHMMfromNavitia(ts) {
+      // returns minutes from 00:00
+      if (!ts || ts.length < 13) return null;
+      const hh = parseInt(ts.slice(9,11), 10);
+      const mm = parseInt(ts.slice(11,13), 10);
+      if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
+      return hh * 60 + mm;
+    }
+
+    function diffMinutes(baseTs, realTs) {
+      const b = parseHHMMfromNavitia(baseTs);
+      const r = parseHHMMfromNavitia(realTs);
+      if (b === null || r === null) return 0;
+      // consider day wrap
+      let diff = r - b;
+      if (diff < -12*60) diff += 24*60; // if huge negative, assume next day
+      if (diff > 12*60) diff -= 24*60; // if huge positive, assume previous day
+      return diff;
+    }
+
     // ====== Поиск станций (places?q=...&type[]=stop_area&count=50) ======
     async function searchStations(q) {
       if (!q || q.trim().length < 2) return [];
@@ -113,11 +131,11 @@
       }
     }
 
-    // ====== Получение отправлений ======
+    // ====== Получение отправлений (count=200 чтобы максимум) ======
     async function fetchDepartures(stopId) {
       if (!stopId) return;
       const now = new Date().toISOString().replace(/[-:]/g,"").split(".")[0]; // 20251013T151200
-      const url = `https://api.sncf.com/v1/coverage/sncf/stop_areas/${encodeURIComponent(stopId)}/departures?datetime=${now}&count=50`;
+      const url = `https://api.sncf.com/v1/coverage/sncf/stop_areas/${encodeURIComponent(stopId)}/departures?datetime=${now}&count=200`;
       try {
         const res = await fetch(url, {
           headers: { Authorization: "Basic " + btoa(API_KEY + ":") }
@@ -135,16 +153,16 @@
       }
     }
 
-    // Отображать ряд таблицы — с учётом миссии справа от линии
+    // Отображать ряд таблицы — миссия справа от линии; если задержка — показать зачёркнутое красное и жёлтое новое время
     function renderBoard(departures) {
       const typeFilter = trainTypeSelect.value;
       const delayedOnly = delayedOnlyCheckbox.checked;
       const rows = [];
 
-      departures.forEach((dep, idx) => {
+      departures.forEach((dep) => {
         const info = dep.display_informations || {};
         const st = dep.stop_date_time || {};
-        // mission: headsign (код миссии) или code или trip_short_name (номер), fallback name
+        // mission: headsign (код миссии) или code или trip_short_name (номер)
         const mission =
           info.headsign || info.code || info.trip_short_name || info.name || info.label || "—";
 
@@ -155,8 +173,7 @@
         const real = st.departure_date_time || scheduled;
         const scheduledFmt = formatTimeFromNavitia(scheduled);
         const realFmt = formatTimeFromNavitia(real);
-        const delaySeconds = st.departure_delay || 0;
-        const delayMinutes = Math.floor(delaySeconds / 60);
+        const delayMinutes = diffMinutes(scheduled, real);
 
         // type detection (commercial_mode)
         const commercial = (info.commercial_mode || info.physical_mode || "").toString();
@@ -171,7 +188,6 @@
         const destination = escapeHtml(info.direction || (dep.terminus && dep.terminus.name) || "—");
         const lineEsc = escapeHtml(line);
         const color = info.color ? ("#" + info.color) : "#0052a3";
-        const platform = st.stop_point ? escapeHtml(st.stop_point.name || "") : "";
 
         rows.push({
           line: lineEsc,
@@ -181,8 +197,7 @@
           real: realFmt,
           delayMinutes,
           color,
-          trainType: escapeHtml(trainType),
-          platform
+          trainType: escapeHtml(trainType)
         });
       });
 
@@ -194,7 +209,7 @@
       // Build HTML: alternate row colors: row-light / row-dark
       boardBody.innerHTML = rows.map((r, i) => {
         const rowClass = (i % 2 === 0) ? "train-row row-light" : "train-row row-dark";
-        const delayCell = r.delayMinutes > 0
+        const timeCell = r.delayMinutes > 0
                           ? `<div class="time-with-delay"><span class="original-time">${r.scheduled}</span><span class="delayed-time">${r.real}</span></div>`
                           : `<span class="on-time">${r.scheduled}</span>`;
         return `
@@ -209,17 +224,12 @@
 
             <div class="col-destination">${r.destination}</div>
 
-            <div class="col-time">${delayCell}</div>
-
-            <div class="col-delay">${r.delayMinutes > 0 ? (r.delayMinutes + " min") : "–"}</div>
+            <div class="col-time">${timeCell}</div>
 
             <div class="col-type">${r.trainType}</div>
-
-            <div class="col-platform">${r.platform || "–"}</div>
           </div>
         `;
       }).join("");
-
     }
 
     // ====== Обработчики UI ======
