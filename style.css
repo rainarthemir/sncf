@@ -121,7 +121,6 @@ body {
 
 /* train type column + логотипы */
 /* train type column + логотипы */
-/* train type column + логотипы */
 .col-type { 
   font-weight:700; 
   opacity:0.95; 
@@ -131,32 +130,24 @@ body {
   gap:0.4rem; 
 }
 
-/* логотипы чуть больше и с белым фоном */
+/* логотипы всех поездов с белым фоном */
 .train-logo { 
-  height:20px;  /* чуть больше, чем раньше */
+  height:16px;   /* компактный размер */
   width:auto; 
-  display:inline-block; 
   background:white; 
-  padding:2px; 
+  padding:1px 2px; 
   border-radius:2px; 
+  display:inline-block;
 }
 
 /* текст рядом с логотипом */
 .train-logo-text { 
-  font-size:0.85rem; 
+  font-size:0.8rem; 
   color:#fff; 
   font-weight:700; 
   display:inline-block;
 }
 
-
-/* для RER и Transilien делаем белый фон под логотип */
-.train-logo.rer, .train-logo.transilien, train-logo.ter { 
-  background:white; 
-  padding:2px; 
-  border-radius:2px; 
-  display:inline-block;
-}
 
 
 /* no-data */
@@ -185,6 +176,7 @@ body {
   .header-title { font-size:1.6rem; }
   .col-type { font-size:0.85rem; }
 }
+
 
 
 
