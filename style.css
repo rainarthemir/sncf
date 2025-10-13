@@ -103,8 +103,8 @@ body {
 .col-line { display:flex; align-items:center; gap:0.6rem; }
 .line-badge { display:inline-flex; align-items:center; justify-content:center; padding:0.4rem 0.6rem; border-radius:6px; color:white; font-weight:900; min-width:46px; text-align:center; border: 2px solid rgba(255,255,255,0.12); }
 
-/* добавим цвет линии фоном */
-.line-badge[data-color] { background-color: attr(data-color color, #0052a3); }
+/* цвет линии фоном по атрибуту data-color */
+.line-badge[data-color] { background-color: var(--line-color, #0052a3); }
 
 /* Mission / Destination / Time */
 .col-mission { font-weight:800; font-size:0.98rem; }
@@ -121,7 +121,7 @@ body {
 
 /* train type column + логотипы */
 .col-type { font-weight:700; opacity:0.95; text-transform:capitalize; display:flex; align-items:center; gap:0.4rem; }
-.train-logo { height:16px; width:auto; } /* уменьшили до прежнего размера */
+.train-logo { height:12px; width:auto; } /* нормальный размер */
 .train-logo-text { font-size:0.85rem; color:#fff; font-weight:700; }
 
 /* для RER и Transilien фон белый под логотип */
@@ -142,23 +142,14 @@ body {
 }
 .refresh-btn:hover { background: rgba(255,255,255,0.12); }
 
-/* Responsive */
+/* Отключаем адаптацию для телефонов, только десктоп */
 @media (max-width: 920px) {
   .board-header, .train-row {
-    grid-template-columns: 80px 120px 1fr 180px 120px;
-    gap:0.5rem;
+    grid-template-columns: 100px 140px 1fr 220px 160px;
+    gap:1rem;
   }
-  .header-content { gap:1rem; }
-  .sncf-logo { font-size:1.4rem; padding:0.2rem 0.6rem; }
-  .header-title { font-size:1.2rem; }
+  .header-content { gap:1.5rem; }
+  .sncf-logo { font-size:2rem; padding:0.4rem 1.2rem; }
+  .header-title { font-size:1.6rem; }
   .col-type { font-size:0.85rem; }
-}
-@media (max-width: 640px) {
-  .board-header, .train-row {
-    grid-template-columns: 70px 110px 1fr 140px;
-    grid-auto-flow: row;
-  }
-  .col-type { font-size:0.8rem; } 
-  .train-logo { height:16px; }
-  .train-logo-text { font-size:0.75rem; }
 }
