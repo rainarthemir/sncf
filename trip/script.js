@@ -1,24 +1,25 @@
 const API_KEY = "e41a2be9-7450-4f1a-a7e6-eb429950186f";
 
-// Get trip ID from URL - исправленный способ
-const urlParams = new URLSearchParams(window.location.search);
-let tripId = null;
-
-// Получаем первый параметр из URL (без имени параметра)
-for (const key of urlParams.keys()) {
-    tripId = key;
-    break;
+// Get trip ID from URL - improved method for 'trip' page
+function getTripIdFromURL() {
+    const search = window.location.search;
+    if (!search) return null;
+    
+    // Remove the '?' and get the tripId
+    let tripId = search.substring(1);
+    
+    // Restore original characters
+    tripId = tripId
+        .replace(/-/g, ':')
+        .replace(/_/g, '/')
+        .replace(/--/g, '?')
+        .replace(/---/g, '=')
+        .replace(/____/g, '&');
+    
+    return tripId;
 }
 
-// Если не нашли через keys, попробуем через get
-if (!tripId) {
-    tripId = urlParams.get('id');
-}
-
-// Восстанавливаем оригинальный формат tripId если нужно
-if (tripId) {
-    tripId = tripId.replace(/-/g, ':').replace(/_/g, '/');
-}
+const tripId = getTripIdFromURL();
 
 // DOM elements
 const tripNumberElement = document.getElementById('tripNumber');
@@ -348,9 +349,10 @@ function showError(message) {
 
 // Initialize the page
 if (tripId) {
+    console.log("Loading trip details for:", tripId);
     fetchTripDetails(tripId);
 } else {
     showError('Aucun identifiant de trajet spécifié');
+    console.log("No trip ID found in URL");
 }
-
 
