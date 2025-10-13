@@ -84,7 +84,7 @@ function renderBoard(departures) {
         const info = dep.display_informations || {};
         const st = dep.stop_date_time || {};
         
-        // Trip ID extraction
+        // Trip ID extraction - более надежное получение tripId
         let tripId = null;
         if (dep.links) {
             const tripLink = dep.links.find(link => link.type === "trip");
@@ -92,6 +92,10 @@ function renderBoard(departures) {
         }
         if (!tripId && dep.trip) {
             tripId = dep.trip.id;
+        }
+        // Если все еще нет tripId, попробуем найти в других местах
+        if (!tripId && info.trip_short_name) {
+            tripId = info.trip_short_name;
         }
 
         const mission = info.headsign || info.code || info.trip_short_name || info.name || info.label || "—";
@@ -164,8 +168,11 @@ function renderBoard(departures) {
         const rowClass = index % 2 === 0 ? "train-row row-light" : "train-row row-dark";
         const clickableClass = tripId ? "clickable-train-row" : "";
 
+        // ВАЖНО: Добавляем data-trip-id только если tripId существует
+        const tripIdAttr = tripId ? `data-trip-id="${tripId}"` : '';
+
         return `
-            <div class="${rowClass} ${clickableClass}" ${tripId ? `data-trip-id="${tripId}"` : ""}>
+            <div class="${rowClass} ${clickableClass}" ${tripIdAttr}>
                 <div class="col-line"><span class="line-badge" style="background-color:${color}">${escapeHtml(lineDisplay)}</span></div>
                 <div class="col-mission">${escapeHtml(mission)}</div>
                 <div class="col-destination">${escapeHtml(destination)}</div>
@@ -175,16 +182,30 @@ function renderBoard(departures) {
         `;
     }).join("");
 
-    // Add click event listeners using event delegation
-    boardBody.addEventListener('click', (event) => {
-        const row = event.target.closest('.clickable-train-row');
-        if (row) {
-            const tripId = row.getAttribute('data-trip-id');
-            if (tripId) {
-                window.location.href = `trip.html?id=${encodeURIComponent(tripId)}`;
-            }
-        }
+    // Добавляем обработчики событий для кликабельных строк
+    addClickHandlers();
+}
+
+// Функция для добавления обработчиков клика
+function addClickHandlers() {
+    const clickableRows = document.querySelectorAll('.clickable-train-row');
+    
+    clickableRows.forEach(row => {
+        // Удаляем существующие обработчики чтобы избежать дублирования
+        row.removeEventListener('click', handleRowClick);
+        // Добавляем новый обработчик
+        row.addEventListener('click', handleRowClick);
     });
+}
+
+// Обработчик клика по строке
+function handleRowClick(event) {
+    const tripId = this.getAttribute('data-trip-id');
+    if (tripId) {
+        // Кодируем только специальные символы, но сохраняем читаемость
+        const cleanTripId = tripId.replace(/:/g, '-').replace(/\//g, '_');
+        window.location.href = `trip.html?${cleanTripId}`;
+    }
 }
 
 // Event listeners
@@ -220,4 +241,9 @@ trainTypeSelect.addEventListener("change", () => {
     if (lastDepartures.length > 0) {
         renderBoard(lastDepartures);
     }
+});
+
+// Инициализация при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    // Можно добавить начальную загрузку если нужно
 });
