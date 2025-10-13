@@ -84,18 +84,21 @@ function renderBoard(departures) {
         const info = dep.display_informations || {};
         const st = dep.stop_date_time || {};
         
-        // Get the real trip ID from the API
-        let tripId = null;
+        // CORRECTED: Get the vehicle_journey ID from the API
+        let vehicleJourneyId = null;
         
-        // Method 1: From trip object
-        if (dep.trip && dep.trip.id) {
-            tripId = dep.trip.id;
+        // Method 1: From vehicle_journey object
+        if (dep.vehicle_journey && dep.vehicle_journey.id) {
+            vehicleJourneyId = dep.vehicle_journey.id;
         }
         // Method 2: From links array
         else if (dep.links) {
-            const tripLink = dep.links.find(link => link.type === "trip");
-            tripId = tripLink ? tripLink.id : null;
+            const vehicleJourneyLink = dep.links.find(link => link.type === "vehicle_journey");
+            vehicleJourneyId = vehicleJourneyLink ? vehicleJourneyLink.id : null;
         }
+        
+        console.log("Departure:", dep); // Debug log
+        console.log("Extracted vehicleJourneyId:", vehicleJourneyId); // Debug log
 
         const mission = info.headsign || info.code || info.trip_short_name || info.name || info.label || "—";
         const line = info.code || "?";
@@ -165,13 +168,13 @@ function renderBoard(departures) {
             `<div class="col-type">${textHtml}</div>`;
 
         const rowClass = index % 2 === 0 ? "train-row row-light" : "train-row row-dark";
-        const clickableClass = tripId ? "clickable-train-row" : "";
+        const clickableClass = vehicleJourneyId ? "clickable-train-row" : "";
 
-        // Add data-trip-id only if tripId exists
-        const tripIdAttr = tripId ? `data-trip-id="${tripId}"` : '';
+        // Add data-vehicle-journey-id only if vehicleJourneyId exists
+        const vehicleJourneyIdAttr = vehicleJourneyId ? `data-vehicle-journey-id="${vehicleJourneyId}"` : '';
 
         return `
-            <div class="${rowClass} ${clickableClass}" ${tripIdAttr}>
+            <div class="${rowClass} ${clickableClass}" ${vehicleJourneyIdAttr}>
                 <div class="col-line"><span class="line-badge" style="background-color:${color}">${escapeHtml(lineDisplay)}</span></div>
                 <div class="col-mission">${escapeHtml(mission)}</div>
                 <div class="col-destination">${escapeHtml(destination)}</div>
@@ -181,37 +184,18 @@ function renderBoard(departures) {
         `;
     }).join("");
 
-    // Add click event listeners using event delegation only
-    addClickHandlers();
-}
-
-// Function to add click handlers
-function addClickHandlers() {
-    // Remove any existing click handlers first
-    boardBody.removeEventListener('click', handleBoardClick);
-    
-    // Add new click handler
-    boardBody.addEventListener('click', handleBoardClick);
-}
-
-// Click handler function
-function handleBoardClick(event) {
-    const row = event.target.closest('.clickable-train-row');
-    if (row) {
-        const tripId = row.getAttribute('data-trip-id');
-        if (tripId) {
-            // Clean the tripId for URL
-            const cleanTripId = tripId
-                .replace(/:/g, '-')
-                .replace(/\//g, '_')
-                .replace(/\?/g, '--')
-                .replace(/=/g, '---')
-                .replace(/&/g, '____');
-            
-            // Redirect to trip page
-            window.location.href = `trip?${cleanTripId}`;
-        }
-    }
+    // Add click event listeners - SIMPLE AND RELIABLE APPROACH
+    const clickableRows = document.querySelectorAll('.clickable-train-row');
+    clickableRows.forEach(row => {
+        row.addEventListener('click', function() {
+            const vehicleJourneyId = this.getAttribute('data-vehicle-journey-id');
+            if (vehicleJourneyId) {
+                // Use encodeURIComponent for proper URL encoding
+                const encodedId = encodeURIComponent(vehicleJourneyId);
+                window.location.href = `trip?${encodedId}`;
+            }
+        });
+    });
 }
 
 // Event listeners
@@ -247,9 +231,4 @@ trainTypeSelect.addEventListener("change", () => {
     if (lastDepartures.length > 0) {
         renderBoard(lastDepartures);
     }
-});
-
-// Initialize click handlers when page loads
-document.addEventListener('DOMContentLoaded', function() {
-    addClickHandlers();
 });
