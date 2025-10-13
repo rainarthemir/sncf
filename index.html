@@ -71,7 +71,7 @@
     let currentStation = null;
     let lastDepartures = [];
 
-    function escapeHtml(s="") { return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function escapeHtml(s=""){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
     function formatTimeFromNavitia(ts){ if(!ts||ts.length<13) return "—"; return ts.slice(9,11)+"h"+ts.slice(11,13); }
     function parseHHMMfromNavitia(ts){ if(!ts||ts.length<13) return null; const hh=parseInt(ts.slice(9,11),10); const mm=parseInt(ts.slice(11,13),10); return (hh%24)*60 + (mm%60);}
     function minutesToHHhMM(mins){ mins=((mins%(24*60))+(24*60))%(24*60); return String(Math.floor(mins/60)).padStart(2,'0')+'h'+String(mins%60).padStart(2,'0'); }
@@ -106,7 +106,8 @@
         const destination=escapeHtml(info.direction||(dep.terminus&&dep.terminus.name)||"—");
         const color=info.color?("#"+info.color):"#0052a3";
         const canceled=info.status && info.status.toLowerCase().includes("cancelled");
-        // формируем логотип и текст
+
+        // логотипы и текст
         let logoHtml="", textHtml="";
         if(trainType.toUpperCase().includes("TER")){ logoHtml='<img src="logo/ter.svg" class="train-logo transilien" alt="TER">'; textHtml='<span class="train-logo-text">HDF</span>'; }
         else if(trainType.toUpperCase().includes("TGV") && info.commercial_mode?.toUpperCase().includes("INOU")){ logoHtml='<img src="logo/inoui.svg" class="train-logo" alt="Inoui">'; textHtml='TGV Inoui';}
@@ -115,8 +116,10 @@
         else if(trainType.toUpperCase().includes("RER")){ logoHtml='<img src="logo/rer.svg" class="train-logo rer" alt="RER">'; textHtml='RER';}
         else if(trainType.toUpperCase().includes("TRANS")){ logoHtml='<img src="logo/transilien.svg" class="train-logo transilien" alt="Transilien">'; textHtml='Transilien';}
         else{ textHtml=escapeHtml(trainType);}
+
         rows.push({line,lineEsc:escapeHtml(line),missionEsc,destination,originalDisplay,newDisplay,delayed,color,logoHtml,textHtml,canceled});
       });
+
       if(!rows.length){ boardBody.innerHTML=`<div class="no-data">Aucun départ après filtrage.</div>`; return;}
       boardBody.innerHTML=rows.map((r,i)=>{
         const rowClass=(i%2===0)?"train-row row-light":"train-row row-dark";
