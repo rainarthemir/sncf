@@ -84,7 +84,7 @@ function renderBoard(departures) {
         const info = dep.display_informations || {};
         const st = dep.stop_date_time || {};
         
-        // CORRECTED: Get the real trip ID from the API
+        // Get the real trip ID from the API
         let tripId = null;
         
         // Method 1: From trip object
@@ -96,9 +96,6 @@ function renderBoard(departures) {
             const tripLink = dep.links.find(link => link.type === "trip");
             tripId = tripLink ? tripLink.id : null;
         }
-        
-        console.log("Departure:", dep); // Debug log to see the structure
-        console.log("Extracted tripId:", tripId); // Debug log
 
         const mission = info.headsign || info.code || info.trip_short_name || info.name || info.label || "—";
         const line = info.code || "?";
@@ -184,41 +181,37 @@ function renderBoard(departures) {
         `;
     }).join("");
 
-    // Add click event listeners using event delegation
-    boardBody.addEventListener('click', (event) => {
-        const row = event.target.closest('.clickable-train-row');
-        if (row) {
-            const tripId = row.getAttribute('data-trip-id');
-            if (tripId) {
-                // FIXED: Use 'trip' instead of 'trip.html' and clean the tripId
-                const cleanTripId = tripId
-                    .replace(/:/g, '-')
-                    .replace(/\//g, '_')
-                    .replace(/\?/g, '--')
-                    .replace(/=/g, '---')
-                    .replace(/&/g, '____');
-                
-                window.location.href = `trip?${cleanTripId}`;
-            }
-        }
-    });
+    // Add click event listeners using event delegation only
+    addClickHandlers();
+}
 
-    // Also add individual handlers for better mobile support
-    document.querySelectorAll('.clickable-train-row').forEach(row => {
-        row.addEventListener('click', function(e) {
-            const tripId = this.getAttribute('data-trip-id');
-            if (tripId) {
-                const cleanTripId = tripId
-                    .replace(/:/g, '-')
-                    .replace(/\//g, '_')
-                    .replace(/\?/g, '--')
-                    .replace(/=/g, '---')
-                    .replace(/&/g, '____');
-                
-                window.location.href = `trip?${cleanTripId}`;
-            }
-        });
-    });
+// Function to add click handlers
+function addClickHandlers() {
+    // Remove any existing click handlers first
+    boardBody.removeEventListener('click', handleBoardClick);
+    
+    // Add new click handler
+    boardBody.addEventListener('click', handleBoardClick);
+}
+
+// Click handler function
+function handleBoardClick(event) {
+    const row = event.target.closest('.clickable-train-row');
+    if (row) {
+        const tripId = row.getAttribute('data-trip-id');
+        if (tripId) {
+            // Clean the tripId for URL
+            const cleanTripId = tripId
+                .replace(/:/g, '-')
+                .replace(/\//g, '_')
+                .replace(/\?/g, '--')
+                .replace(/=/g, '---')
+                .replace(/&/g, '____');
+            
+            // Redirect to trip page
+            window.location.href = `trip?${cleanTripId}`;
+        }
+    }
 }
 
 // Event listeners
@@ -254,4 +247,9 @@ trainTypeSelect.addEventListener("change", () => {
     if (lastDepartures.length > 0) {
         renderBoard(lastDepartures);
     }
+});
+
+// Initialize click handlers when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    addClickHandlers();
 });
