@@ -84,7 +84,10 @@ body {
   font-size: 0.85rem;
   font-weight: 900;
 }
-.board-body { padding: 0; }
+.board-body { 
+  padding: 0; 
+  cursor: default;
+}
 
 /* ROWS */
 .train-row {
@@ -94,20 +97,18 @@ body {
   padding: 0.85rem 1rem;
   align-items: center;
   transition: all 0.2s ease;
-  cursor: default;
 }
 .row-light { background: #003875; }
 .row-dark { background: #0052a3; }
 
-/* Clickable rows with hover effect */
+/* Clickable rows */
 .clickable-train-row {
   cursor: pointer !important;
-  transition: all 0.3s ease;
 }
 
 .clickable-train-row:hover {
   background: rgba(255, 255, 255, 0.15) !important;
-  transform: translateY(-2px);
+  transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   border-left: 4px solid #ffd700;
 }
@@ -117,7 +118,11 @@ body {
   transition: transform 0.1s ease;
 }
 
-.col-line { display: flex; align-items: center; gap: 0.5rem; }
+.col-line { 
+  display: flex; 
+  align-items: center; 
+  gap: 0.5rem; 
+}
 .line-badge {
   display: inline-flex;
   align-items: center;
@@ -134,14 +139,35 @@ body {
   transform: scale(1.05);
 }
 
-.col-mission { font-weight: 800; }
-.col-destination { font-weight: 700; }
-.col-time { font-weight: 900; }
-.time-with-delay { display: flex; gap: 0.5rem; }
-.original-time { color: #ff6b6b; text-decoration: line-through; }
-.delayed-time { color: #ffd700; font-weight: 900; }
-.on-time { color: #fff; font-weight: 900; }
-.canceled-time { color: #ff4d4d; text-decoration: line-through; }
+.col-mission { 
+  font-weight: 800; 
+}
+.col-destination { 
+  font-weight: 700; 
+}
+.col-time { 
+  font-weight: 900; 
+}
+.time-with-delay { 
+  display: flex; 
+  gap: 0.5rem; 
+}
+.original-time { 
+  color: #ff6b6b; 
+  text-decoration: line-through; 
+}
+.delayed-time { 
+  color: #ffd700; 
+  font-weight: 900; 
+}
+.on-time { 
+  color: #fff; 
+  font-weight: 900; 
+}
+.canceled-time { 
+  color: #ff4d4d; 
+  text-decoration: line-through; 
+}
 
 .col-type {
   display: flex;
@@ -150,8 +176,17 @@ body {
   font-weight: 700;
   text-transform: capitalize;
 }
-.train-logo { height: 22px; width: auto; background: white; border-radius: 3px; padding: 2px; }
-.train-logo-text { font-size: 0.85rem; color: #fff; }
+.train-logo { 
+  height: 22px; 
+  width: auto; 
+  background: white; 
+  border-radius: 3px; 
+  padding: 2px; 
+}
+.train-logo-text { 
+  font-size: 0.85rem; 
+  color: #fff; 
+}
 
 /* No data */
 .no-data {
