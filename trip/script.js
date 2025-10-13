@@ -1,25 +1,20 @@
 const API_KEY = "e41a2be9-7450-4f1a-a7e6-eb429950186f";
 
-// Get trip ID from URL - improved method for 'trip' page
-function getTripIdFromURL() {
+// Get vehicle_journey ID from URL
+function getVehicleJourneyIdFromURL() {
     const search = window.location.search;
     if (!search) return null;
     
-    // Remove the '?' and get the tripId
-    let tripId = search.substring(1);
+    // Remove the '?' and get the vehicleJourneyId
+    let vehicleJourneyId = search.substring(1);
     
-    // Restore original characters
-    tripId = tripId
-        .replace(/-/g, ':')
-        .replace(/_/g, '/')
-        .replace(/--/g, '?')
-        .replace(/---/g, '=')
-        .replace(/____/g, '&');
+    // Decode the URL component
+    vehicleJourneyId = decodeURIComponent(vehicleJourneyId);
     
-    return tripId;
+    return vehicleJourneyId;
 }
 
-const tripId = getTripIdFromURL();
+const vehicleJourneyId = getVehicleJourneyIdFromURL();
 
 // DOM elements
 const tripNumberElement = document.getElementById('tripNumber');
@@ -86,33 +81,33 @@ function getStatusClass(status) {
     }
 }
 
-// Fetch trip details
-async function fetchTripDetails(tripId) {
-    if (!tripId) {
-        showError('ID de trajet manquant');
+// Fetch vehicle journey details
+async function fetchVehicleJourneyDetails(vehicleJourneyId) {
+    if (!vehicleJourneyId) {
+        showError('ID de vehicle journey manquant');
         return;
     }
 
     try {
-        // First get trip basic info
-        const tripUrl = `https://api.sncf.com/v1/coverage/sncf/trips/${encodeURIComponent(tripId)}`;
-        const tripRes = await fetch(tripUrl, {
+        // Use vehicle_journeys endpoint instead of trips
+        const vehicleJourneyUrl = `https://api.sncf.com/v1/coverage/sncf/vehicle_journeys/${encodeURIComponent(vehicleJourneyId)}`;
+        const vehicleJourneyRes = await fetch(vehicleJourneyUrl, {
             headers: { Authorization: "Basic " + btoa(API_KEY + ":") }
         });
 
-        if (!tripRes.ok) {
-            throw new Error(`Erreur API: ${tripRes.status}`);
+        if (!vehicleJourneyRes.ok) {
+            throw new Error(`Erreur API: ${vehicleJourneyRes.status}`);
         }
 
-        const tripData = await tripRes.json();
-        const trip = tripData.trips?.[0];
+        const vehicleJourneyData = await vehicleJourneyRes.json();
+        const vehicleJourney = vehicleJourneyData.vehicle_journeys?.[0];
 
-        if (!trip) {
-            throw new Error('Trajet non trouvé');
+        if (!vehicleJourney) {
+            throw new Error('Vehicle journey non trouvé');
         }
 
-        // Then get route schedules for stop times
-        const schedulesUrl = `https://api.sncf.com/v1/coverage/sncf/trips/${encodeURIComponent(tripId)}/route_schedules?count=100`;
+        // Get route schedules for stop times
+        const schedulesUrl = `https://api.sncf.com/v1/coverage/sncf/vehicle_journeys/${encodeURIComponent(vehicleJourneyId)}/route_schedules?count=100`;
         const schedulesRes = await fetch(schedulesUrl, {
             headers: { Authorization: "Basic " + btoa(API_KEY + ":") }
         });
@@ -123,34 +118,33 @@ async function fetchTripDetails(tripId) {
 
         const schedulesData = await schedulesRes.json();
         
-        displayTripInfo(trip, schedulesData);
+        displayVehicleJourneyInfo(vehicleJourney, schedulesData);
     } catch (error) {
-        console.error('Error fetching trip details:', error);
+        console.error('Error fetching vehicle journey details:', error);
         showError(error.message);
     }
 }
 
-function displayTripInfo(trip, schedulesData) {
-    // Basic trip info
-    const info = trip;
-    const name = info.name || 'Train sans nom';
-    const number = info.code || '--';
-    const commercialMode = info.commercial_mode?.name || 'Train';
+function displayVehicleJourneyInfo(vehicleJourney, schedulesData) {
+    // Basic vehicle journey info
+    const name = vehicleJourney.name || 'Train sans nom';
+    const number = vehicleJourney.code || '--';
+    const commercialMode = vehicleJourney.commercial_mode?.name || 'Train';
     
     tripNumberElement.textContent = number;
     tripNameElement.textContent = name;
     tripTypeElement.textContent = commercialMode;
 
     // Try to get coach information
-    const vehicleJourneys = schedulesData.route_schedules?.[0]?.vehicle_journeys || [];
-    if (vehicleJourneys.length > 0) {
-        const vj = vehicleJourneys[0];
-        if (vj.codes && vj.codes.find(c => c.type === 'coach_count')) {
-            const coachCount = vj.codes.find(c => c.type === 'coach_count').value;
-            coachInfoElement.textContent = `${coachCount} voitures`;
+    if (vehicleJourney.codes) {
+        const coachCountCode = vehicleJourney.codes.find(c => c.type === 'coach_count');
+        if (coachCountCode) {
+            coachInfoElement.textContent = `${coachCountCode.value} voitures`;
         } else {
             coachInfoElement.textContent = 'Info voitures non disponible';
         }
+    } else {
+        coachInfoElement.textContent = 'Info voitures non disponible';
     }
 
     // Process stop times
@@ -348,11 +342,10 @@ function showError(message) {
 }
 
 // Initialize the page
-if (tripId) {
-    console.log("Loading trip details for:", tripId);
-    fetchTripDetails(tripId);
+if (vehicleJourneyId) {
+    console.log("Loading vehicle journey details for:", vehicleJourneyId);
+    fetchVehicleJourneyDetails(vehicleJourneyId);
 } else {
-    showError('Aucun identifiant de trajet spécifié');
-    console.log("No trip ID found in URL");
+    showError('Aucun identifiant de vehicle journey spécifié');
+    console.log("No vehicle journey ID found in URL");
 }
-
