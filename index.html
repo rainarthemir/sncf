@@ -16,7 +16,6 @@
     </header>
 
     <main class="container">
-      <!-- Search Section -->
       <section class="search-section">
         <label class="search-label" for="stationSearch">Rechercher une gare</label>
         <div class="search-wrapper">
@@ -24,7 +23,7 @@
           <div id="suggestions" class="suggestions" role="listbox" aria-hidden="true"></div>
         </div>
 
-        <div class="filters" style="margin-top: 1rem; display:flex; gap:1rem; flex-wrap:wrap;">
+        <div class="filters" style="margin-top: 1rem;">
           <div>
             <label for="trainType" style="color:#fff;font-weight:700">Type de train</label><br />
             <select id="trainType" style="padding:0.6rem;border-radius:4px;margin-top:0.3rem;">
@@ -37,19 +36,12 @@
             </select>
           </div>
 
-          <div style="align-self:center;">
-            <label style="color:#fff;font-weight:700">
-              <input id="delayedOnly" type="checkbox" /> Seulement en retard
-            </label>
-          </div>
-
           <div style="margin-left:auto; align-self:center;">
             <button id="refreshBtn" class="refresh-btn">Actualiser</button>
           </div>
         </div>
       </section>
 
-      <!-- Board Section -->
       <section class="board-section">
         <div class="board">
           <div class="board-header">
@@ -69,184 +61,167 @@
   </div>
 
   <script>
-  // ====== Конфиг ======
-  const API_KEY = "e41a2be9-7450-4f1a-a7e6-eb429950186f";
-  const stationInput = document.getElementById("stationSearch");
-  const suggestionsBox = document.getElementById("suggestions");
-  const boardBody = document.getElementById("board-body");
-  const trainTypeSelect = document.getElementById("trainType");
-  const delayedOnlyCheckbox = document.getElementById("delayedOnly");
-  const refreshBtn = document.getElementById("refreshBtn");
+    const API_KEY = "e41a2be9-7450-4f1a-a7e6-eb429950186f";
+    const stationInput = document.getElementById("stationSearch");
+    const suggestionsBox = document.getElementById("suggestions");
+    const boardBody = document.getElementById("board-body");
+    const trainTypeSelect = document.getElementById("trainType");
+    const refreshBtn = document.getElementById("refreshBtn");
 
-  let currentStation = null;
-  let lastDepartures = [];
+    let currentStation = null;
+    let lastDepartures = [];
 
-  // ====== Утилиты ======
-  function escapeHtml(s = "") {
-    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
-  }
+    function escapeHtml(s = "") {
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+    }
 
-  function formatTimeFromNavitia(ts) {
-    if (!ts || ts.length < 13) return "—";
-    const hhmm = ts.slice(9, 13);
-    return hhmm.slice(0, 2) + "h" + hhmm.slice(2);
-  }
+    function formatTimeFromNavitia(ts) {
+      if (!ts || ts.length < 13) return "—";
+      const hhmm = ts.slice(9, 13);
+      return hhmm.slice(0, 2) + "h" + hhmm.slice(2);
+    }
 
-  function parseHHMMfromNavitia(ts) {
-    if (!ts || ts.length < 13) return null;
-    const hh = parseInt(ts.slice(9,11), 10);
-    const mm = parseInt(ts.slice(11,13), 10);
-    if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
-    return ((hh % 24) * 60) + (mm % 60);
-  }
+    function parseHHMMfromNavitia(ts) {
+      if (!ts || ts.length < 13) return null;
+      const hh = parseInt(ts.slice(9,11), 10);
+      const mm = parseInt(ts.slice(11,13), 10);
+      if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
+      return ((hh % 24) * 60) + (mm % 60);
+    }
 
-  function minutesToHHhMM(mins) {
-    mins = ((mins % (24*60)) + (24*60)) % (24*60);
-    const hh = Math.floor(mins / 60);
-    const mm = mins % 60;
-    return String(hh).padStart(2, '0') + 'h' + String(mm).padStart(2, '0');
-  }
+    function minutesToHHhMM(mins) {
+      mins = ((mins % (24*60)) + (24*60)) % (24*60);
+      const hh = Math.floor(mins / 60);
+      const mm = mins % 60;
+      return String(hh).padStart(2, '0') + 'h' + String(mm).padStart(2, '0');
+    }
 
-  function addMinutesToNavitia(ts, addMinutes) {
-    const baseM = parseHHMMfromNavitia(ts);
-    if (baseM === null) return null;
-    return minutesToHHhMM(baseM + addMinutes);
-  }
+    function addMinutesToNavitia(ts, addMinutes) {
+      const baseM = parseHHMMfromNavitia(ts);
+      if (baseM === null) return null;
+      return minutesToHHhMM(baseM + addMinutes);
+    }
 
-  function diffMinutes(baseTs, realTs) {
-    const b = parseHHMMfromNavitia(baseTs);
-    const r = parseHHMMfromNavitia(realTs);
-    if (b === null || r === null) return 0;
-    let diff = r - b;
-    if (diff < -12*60) diff += 24*60;
-    if (diff > 12*60) diff -= 24*60;
-    return diff;
-  }
+    async function searchStations(q) {
+      if (!q || q.trim().length < 2) return [];
+      const url = `https://api.sncf.com/v1/coverage/sncf/places?q=${encodeURIComponent(q)}&type[]=stop_area&count=50`;
+      try {
+        const res = await fetch(url, { headers: { Authorization: "Basic " + btoa(API_KEY + ":") } });
+        if (!res.ok) return [];
+        const json = await res.json();
+        return (json.places || []).map(p => ({
+          id: p.id,
+          label: p.stop_area?.label || p.name || p.id
+        }));
+      } catch(e){ console.error(e); return [];}
+    }
 
-  // ====== Поиск станций ======
-  async function searchStations(q) {
-    if (!q || q.trim().length < 2) return [];
-    const url = `https://api.sncf.com/v1/coverage/sncf/places?q=${encodeURIComponent(q)}&type[]=stop_area&count=50`;
-    try {
-      const res = await fetch(url, { headers: { Authorization: "Basic " + btoa(API_KEY + ":") } });
-      if (!res.ok) return [];
-      const json = await res.json();
-      return (json.places || []).map(p => ({ id: p.id, label: p.stop_area?.label || p.name || p.id }));
-    } catch (e) { console.error(e); return []; }
-  }
+    async function fetchDepartures(stopId) {
+      if (!stopId) return;
+      const now = new Date().toISOString().replace(/[-:]/g,"").split(".")[0];
+      const url = `https://api.sncf.com/v1/coverage/sncf/stop_areas/${encodeURIComponent(stopId)}/departures?datetime=${now}&count=200`;
+      try {
+        const res = await fetch(url, { headers: { Authorization: "Basic " + btoa(API_KEY + ":") } });
+        if (!res.ok) { boardBody.innerHTML = `<div class="no-data">Erreur API: ${res.status}</div>`; return; }
+        const json = await res.json();
+        lastDepartures = json.departures || [];
+        renderBoard(lastDepartures);
+      } catch(e){ console.error(e); boardBody.innerHTML = `<div class="no-data">Erreur de connexion</div>`;}
+    }
 
-  // ====== Получение отправлений ======
-  async function fetchDepartures(stopId) {
-    if (!stopId) return;
-    const now = new Date().toISOString().replace(/[-:]/g,"").split(".")[0];
-    const url = `https://api.sncf.com/v1/coverage/sncf/stop_areas/${encodeURIComponent(stopId)}/departures?datetime=${now}&count=200`;
-    try {
-      const res = await fetch(url, { headers: { Authorization: "Basic " + btoa(API_KEY + ":") } });
-      if (!res.ok) { boardBody.innerHTML = `<div class="no-data">Erreur API: ${res.status}</div>`; return; }
-      const json = await res.json();
-      lastDepartures = json.departures || [];
-      renderBoard(lastDepartures);
-    } catch(e) { console.error(e); boardBody.innerHTML = `<div class="no-data">Erreur de connexion</div>`; }
-  }
-
-  // ====== Рендер доски ======
-  function renderBoard(departures) {
-    const typeFilter = trainTypeSelect.value;
-    const delayedOnly = delayedOnlyCheckbox.checked;
-    const rows = [];
-
-    departures.forEach(dep => {
-      const info = dep.display_informations || {};
-      const st = dep.stop_date_time || {};
-      const mission = info.headsign || info.code || info.trip_short_name || "—";
-      const line = info.code || (info.network && info.network.name) || "—";
-
-      const baseTs = st.base_departure_date_time || null;
-      const realTs = st.departure_date_time || null;
-      const delaySec = st.departure_delay || 0;
-      const delayMin = Math.floor((delaySec || 0) / 60);
-
-      let delayed = false, canceled = info.canceled === true;
-      let originalDisplay = formatTimeFromNavitia(realTs);
-      let newDisplay = null;
-
-      if (!canceled && baseTs && realTs && baseTs !== realTs) {
-        delayed = true;
-        originalDisplay = formatTimeFromNavitia(baseTs);
-        newDisplay = formatTimeFromNavitia(realTs);
-      } else if (baseTs && delayMin > 0) {
-        delayed = true;
-        originalDisplay = formatTimeFromNavitia(baseTs);
-        newDisplay = addMinutesToNavitia(baseTs, delayMin);
+    function getLogoHTML(trainType, network) {
+      let logo = "";
+      let infoText = "";
+      if(trainType.toUpperCase().includes("TER")) { logo="logo/ter.svg"; infoText=(network || "").toUpperCase(); }
+      else if(trainType.toUpperCase().includes("TGV")) logo="logo/inoui.svg"; 
+      else if(trainType.toUpperCase().includes("OUIGO")) logo="logo/ouigo.svg";
+      else if(trainType.toUpperCase().includes("RER")) logo="logo/rer.svg";
+      else if(trainType.toUpperCase().includes("TRANSILIEN")) logo="logo/transilien.svg";
+      else if(trainType.toUpperCase().includes("INTERCITÉS")) logo="logo/intercite.svg";
+      if(logo) {
+        let bgStyle = (trainType.toUpperCase().includes("RER") || trainType.toUpperCase().includes("TRANSILIEN")) ? 'background:#fff;padding:2px;border-radius:3px;' : '';
+        return `<img src="${logo}" class="train-logo" style="${bgStyle}"/>` + (infoText ? `<span class="train-logo-text">${escapeHtml(infoText)}</span>` : "");
       }
+      return escapeHtml(trainType);
+    }
 
-      const commercial = (info.commercial_mode || info.physical_mode || "").toString();
-      if (typeFilter !== 'all' && !commercial.toUpperCase().includes(typeFilter.toUpperCase())) return;
-      if (delayedOnly && !delayed) return;
+    function renderBoard(departures) {
+      const typeFilter = trainTypeSelect.value;
+      const rows = [];
 
-      const destination = escapeHtml(info.direction || (dep.terminus && dep.terminus.name) || "—");
+      departures.forEach((dep) => {
+        const info = dep.display_informations || {};
+        const st = dep.stop_date_time || {};
+        const mission = info.headsign || info.code || info.trip_short_name || info.name || info.label || "—";
+        const line = info.code || (info.network && info.network.name) || "?";
+        const baseTs = st.base_departure_date_time || null;
+        const realTs = st.departure_date_time || null;
+        const delaySeconds = st.departure_delay || 0;
+        const delayMinutesFromField = Math.floor((delaySeconds || 0)/60);
+        const canceled = st.cancelled || false;
 
-      rows.push({line, mission: escapeHtml(mission), destination, originalDisplay, newDisplay, delayed, canceled, trainType: commercial});
+        let delayed=false, originalDisplay=null, newDisplay=null;
+        if(canceled) { originalDisplay=formatTimeFromNavitia(realTs); newDisplay="supprimé"; }
+        else if(baseTs && realTs && baseTs!==realTs) { delayed=true; originalDisplay=formatTimeFromNavitia(baseTs); newDisplay=formatTimeFromNavitia(realTs);}
+        else if(baseTs && delayMinutesFromField>0) { delayed=true; originalDisplay=formatTimeFromNavitia(baseTs); newDisplay=addMinutesToNavitia(baseTs, delayMinutesFromField);}
+        else { originalDisplay=formatTimeFromNavitia(realTs||baseTs); }
+
+        const commercial = (info.commercial_mode || info.physical_mode || "").toString();
+        const trainType = commercial || "Autre";
+
+        const matchType = typeFilter==="all" || (commercial && commercial.toUpperCase().includes(typeFilter.toUpperCase()));
+        if(!matchType) return;
+
+        rows.push({ line, mission, destination: escapeHtml(info.direction||"—"), originalDisplay, newDisplay, delayed, canceled, color: info.color ? ("#"+info.color) : "#0052a3", trainType, network: info.network ? info.network.name : ""});
+      });
+
+      if(!rows.length) { boardBody.innerHTML=`<div class="no-data">Aucun départ après filtrage.</div>`; return;}
+
+      boardBody.innerHTML = rows.map((r,i)=>{
+        const rowClass = (i%2===0)?"train-row row-light":"train-row row-dark";
+        let timeCell = "";
+        if(r.canceled) timeCell=`<span class="original-time canceled-time">${r.originalDisplay}</span><span class="delayed-time canceled-text">${r.newDisplay}</span>`;
+        else if(r.delayed) timeCell=`<div class="time-with-delay"><span class="original-time">${r.originalDisplay}</span><span class="delayed-time">${r.newDisplay}</span></div>`;
+        else timeCell=`<span class="on-time">${r.originalDisplay}</span>`;
+
+        return `<div class="${rowClass}">
+          <div class="col-line"><span class="line-badge" style="background:${r.color}">${r.line}</span></div>
+          <div class="col-mission">${escapeHtml(r.mission)}</div>
+          <div class="col-destination">${r.destination}</div>
+          <div class="col-time">${timeCell}</div>
+          <div class="col-type">${getLogoHTML(r.trainType,r.network)}</div>
+        </div>`;
+      }).join("");
+    }
+
+    let debounceTimer=null;
+    stationInput.addEventListener("input",(e)=>{
+      const q=e.target.value.trim();
+      clearTimeout(debounceTimer);
+      suggestionsBox.innerHTML=""; suggestionsBox.style.display="none";
+      if(!q||q.length<2) return;
+      debounceTimer=setTimeout(async()=>{
+        const res=await searchStations(q);
+        if(!res.length){ suggestionsBox.innerHTML=`<div class="suggestion-empty">Aucun résultat</div>`; suggestionsBox.style.display="block"; return; }
+        suggestionsBox.innerHTML=res.map(s=>`<div class="suggestion-item" data-id="${s.id}">${escapeHtml(s.label)}</div>`).join("");
+        suggestionsBox.style.display="block";
+      },300);
     });
 
-    if (!rows.length) { boardBody.innerHTML = `<div class="no-data">Aucun départ après filtrage.</div>`; return; }
+    suggestionsBox.addEventListener("click",(ev)=>{
+      const el = ev.target.closest(".suggestion-item");
+      if(!el) return;
+      const id = el.dataset.id;
+      const label = el.textContent;
+      stationInput.value = label;
+      suggestionsBox.innerHTML=""; suggestionsBox.style.display="none";
+      currentStation={id,label};
+      fetchDepartures(id);
+    });
 
-    boardBody.innerHTML = rows.map((r,i) => {
-      const rowClass = (i%2===0) ? "train-row row-light" : "train-row row-dark";
-      let timeCell = r.canceled ? `<span class="original-time" style="color:red;text-decoration:line-through">${r.originalDisplay}</span> <span style="color:red;">supprimé</span>` :
-                     r.delayed ? `<div class="time-with-delay"><span class="original-time">${r.originalDisplay}</span><span class="delayed-time">${r.newDisplay}</span></div>` :
-                     `<span class="on-time">${r.originalDisplay}</span>`;
-
-      // логотипы
-      let logoHTML = '';
-      if (r.trainType.toUpperCase().includes('TER')) logoHTML = `<img src="logo/ter.svg" class="logo-type" />`;
-      else if (r.trainType.toUpperCase().includes('RER')) logoHTML = `<img src="logo/rer.svg" class="logo-type" />`;
-      else if (r.trainType.toUpperCase().includes('TGV INOUI')) logoHTML = `<img src="logo/inoui.svg" class="logo-type" />`;
-      else if (r.trainType.toUpperCase().includes('TGV OUIGO')) logoHTML = `<img src="logo/ouigo.svg" class="logo-type" />`;
-      else if (r.trainType.toUpperCase().includes('TRANSILIEN')) logoHTML = `<img src="logo/transilien.svg" class="logo-type" />`;
-      else if (r.trainType.toUpperCase().includes('INTERCITÉS')) logoHTML = `<img src="logo/intercite.svg" class="logo-type" />`;
-
-      return `<div class="${rowClass}">
-                <div class="col-line">${r.line}</div>
-                <div class="col-mission">${r.mission}</div>
-                <div class="col-destination">${r.destination}</div>
-                <div class="col-time">${timeCell}</div>
-                <div class="col-type">${logoHTML}${r.trainType}</div>
-              </div>`;
-    }).join('');
-  }
-
-  // ====== UI ======
-  let debounceTimer = null;
-  stationInput.addEventListener("input", e => {
-    const q = e.target.value.trim();
-    clearTimeout(debounceTimer);
-    suggestionsBox.innerHTML = ""; suggestionsBox.style.display="none";
-    if (!q || q.length < 2) return;
-    debounceTimer = setTimeout(async () => {
-      const res = await searchStations(q);
-      if (!res.length) { suggestionsBox.innerHTML=`<div class="suggestion-empty">Aucun résultat</div>`; suggestionsBox.style.display="block"; return; }
-      suggestionsBox.innerHTML = res.map(s => `<div class="suggestion-item" data-id="${s.id}">${escapeHtml(s.label)}</div>`).join('');
-      suggestionsBox.style.display="block";
-    }, 300);
-  });
-
-  suggestionsBox.addEventListener("click", ev => {
-    const el = ev.target.closest(".suggestion-item");
-    if (!el) return;
-    const id = el.dataset.id;
-    const label = el.textContent;
-    stationInput.value = label;
-    suggestionsBox.innerHTML = ""; suggestionsBox.style.display="none";
-    currentStation = { id, label };
-    fetchDepartures(id);
-  });
-
-  trainTypeSelect.addEventListener("change", () => renderBoard(lastDepartures));
-  delayedOnlyCheckbox.addEventListener("change", () => renderBoard(lastDepartures));
-  refreshBtn.addEventListener("click", () => { if(currentStation) fetchDepartures(currentStation.id); });
-  setInterval(() => { if(currentStation) fetchDepartures(currentStation.id); }, 60000);
-
+    trainTypeSelect.addEventListener("change",()=>renderBoard(lastDepartures));
+    refreshBtn.addEventListener("click",()=>{ if(currentStation && currentStation.id) fetchDepartures(currentStation.id); });
+    setInterval(()=>{ if(currentStation && currentStation.id) fetchDepartures(currentStation.id); },60000);
   </script>
 </body>
 </html>
