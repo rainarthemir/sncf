@@ -18,13 +18,6 @@ function formatTimeFromNavitia(ts) {
     return ts.slice(9, 11) + "h" + ts.slice(11, 13);
 }
 
-function parseHHMMfromNavitia(ts) {
-    if (!ts || ts.length < 13) return null;
-    const hh = parseInt(ts.slice(9, 11), 10);
-    const mm = parseInt(ts.slice(11, 13), 10);
-    return (hh % 24) * 60 + (mm % 60);
-}
-
 // Station search
 async function searchStations(q) {
     if (!q || q.trim().length < 2) return [];
@@ -87,18 +80,17 @@ function renderBoard(departures) {
         // CORRECTED: Get the vehicle_journey ID from the API
         let vehicleJourneyId = null;
         
-        // Method 1: From vehicle_journey object
+        // Method 1: From vehicle_journey object (this is the correct one)
         if (dep.vehicle_journey && dep.vehicle_journey.id) {
             vehicleJourneyId = dep.vehicle_journey.id;
+            console.log("Found vehicle_journey ID:", vehicleJourneyId);
         }
-        // Method 2: From links array
+        // Method 2: From links array as fallback
         else if (dep.links) {
             const vehicleJourneyLink = dep.links.find(link => link.type === "vehicle_journey");
             vehicleJourneyId = vehicleJourneyLink ? vehicleJourneyLink.id : null;
+            console.log("Found vehicle_journey ID from links:", vehicleJourneyId);
         }
-        
-        console.log("Departure:", dep); // Debug log
-        console.log("Extracted vehicleJourneyId:", vehicleJourneyId); // Debug log
 
         const mission = info.headsign || info.code || info.trip_short_name || info.name || info.label || "—";
         const line = info.code || "?";
@@ -120,10 +112,9 @@ function renderBoard(departures) {
         } else if (baseTs && delayM > 0) {
             delayed = true;
             originalDisplay = formatTimeFromNavitia(baseTs);
-            const baseMinutes = parseHHMMfromNavitia(baseTs);
-            newDisplay = baseMinutes !== null ? 
-                `${String(Math.floor((baseMinutes + delayM) / 60)).padStart(2, '0')}h${String((baseMinutes + delayM) % 60).padStart(2, '0')}` : 
-                formatTimeFromNavitia(realTs || baseTs);
+            const baseMinutes = parseInt(baseTs.slice(9, 11)) * 60 + parseInt(baseTs.slice(11, 13));
+            const delayedMinutes = baseMinutes + delayM;
+            newDisplay = `${String(Math.floor(delayedMinutes / 60)).padStart(2, '0')}h${String(delayedMinutes % 60).padStart(2, '0')}`;
         } else {
             delayed = false;
             originalDisplay = formatTimeFromNavitia(realTs || baseTs);
@@ -187,12 +178,18 @@ function renderBoard(departures) {
     // Add click event listeners - SIMPLE AND RELIABLE APPROACH
     const clickableRows = document.querySelectorAll('.clickable-train-row');
     clickableRows.forEach(row => {
-        row.addEventListener('click', function() {
+        // Remove any existing listeners to avoid duplicates
+        const newRow = row.cloneNode(true);
+        row.parentNode.replaceChild(newRow, row);
+        
+        // Add new click listener
+        newRow.addEventListener('click', function() {
             const vehicleJourneyId = this.getAttribute('data-vehicle-journey-id');
             if (vehicleJourneyId) {
-                // Use encodeURIComponent for proper URL encoding
-                const encodedId = encodeURIComponent(vehicleJourneyId);
-                window.location.href = `trip?${encodedId}`;
+                console.log("Clicked on vehicle_journey:", vehicleJourneyId);
+                // CORRECTED: Use proper encoding and redirect to trip page
+                // Don't use encodeURIComponent here - we want the raw ID in URL
+                window.location.href = `trip?${vehicleJourneyId}`;
             }
         });
     });
