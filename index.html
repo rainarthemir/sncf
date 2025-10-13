@@ -86,6 +86,7 @@
       const rows=[];
       departures.forEach((dep)=>{
         const info=dep.display_informations||{};
+        const lineDisplay = line === "?" ? (trainType || "—") : line;
         const st=dep.stop_date_time||{};
         const mission=info.headsign||info.code||info.trip_short_name||info.name||info.label||"—";
         const line=info.code||"?";
@@ -117,8 +118,7 @@
         else if(trainType.toUpperCase().includes("TRANS")){ logoHtml='<img src="logo/transilien.svg" class="train-logo transilien" alt="Transilien">'; textHtml='Transilien';}
         else{ textHtml=escapeHtml(trainType);}
 
-        rows.push({line,lineEsc:escapeHtml(line),missionEsc,destination,originalDisplay,newDisplay,delayed,color,logoHtml,textHtml,canceled});
-      });
+        rows.push({line: lineDisplay, lineEsc: escapeHtml(lineDisplay), missionEsc, destination, originalDisplay, newDisplay, delayed, color, logoHtml, textHtml, canceled});
 
       if(!rows.length){ boardBody.innerHTML=`<div class="no-data">Aucun départ après filtrage.</div>`; return;}
       boardBody.innerHTML=rows.map((r,i)=>{
@@ -161,3 +161,4 @@
   </script>
 </body>
 </html>
+
