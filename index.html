@@ -23,7 +23,7 @@
           <div id="suggestions" class="suggestions" role="listbox" aria-hidden="true"></div>
         </div>
 
-        <div class="filters" style="margin-top: 1rem;">
+        <div class="filters" style="margin-top: 1rem; display:flex; gap:1rem; align-items:center;">
           <div>
             <label for="trainType" style="color:#fff;font-weight:700">Type de train</label><br />
             <select id="trainType" style="padding:0.6rem;border-radius:4px;margin-top:0.3rem;">
@@ -71,157 +71,90 @@
     let currentStation = null;
     let lastDepartures = [];
 
-    function escapeHtml(s = "") {
-      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
-    }
+    function escapeHtml(s="") { return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function formatTimeFromNavitia(ts){ if(!ts||ts.length<13) return "—"; return ts.slice(9,11)+"h"+ts.slice(11,13); }
+    function parseHHMMfromNavitia(ts){ if(!ts||ts.length<13) return null; const hh=parseInt(ts.slice(9,11),10); const mm=parseInt(ts.slice(11,13),10); return (hh%24)*60 + (mm%60);}
+    function minutesToHHhMM(mins){ mins=((mins%(24*60))+(24*60))%(24*60); return String(Math.floor(mins/60)).padStart(2,'0')+'h'+String(mins%60).padStart(2,'0'); }
+    function addMinutesToNavitia(ts,addM){ const b=parseHHMMfromNavitia(ts); if(b===null) return null; return minutesToHHhMM(b+addM);}
+    function diffMinutes(baseTs,realTs){ const b=parseHHMMfromNavitia(baseTs); const r=parseHHMMfromNavitia(realTs); if(b===null||r===null) return 0; let d=r-b; if(d<-12*60) d+=24*60; if(d>12*60) d-=24*60; return d;}
 
-    function formatTimeFromNavitia(ts) {
-      if (!ts || ts.length < 13) return "—";
-      const hhmm = ts.slice(9, 13);
-      return hhmm.slice(0, 2) + "h" + hhmm.slice(2);
-    }
+    async function searchStations(q){ if(!q||q.trim().length<2) return []; const url=`https://api.sncf.com/v1/coverage/sncf/places?q=${encodeURIComponent(q)}&type[]=stop_area&count=50`; try{ const res=await fetch(url,{headers:{Authorization:"Basic "+btoa(API_KEY+":")}}); if(!res.ok) return []; const json=await res.json(); return (json.places||[]).map(p=>({id:p.id,label:p.stop_area?.label||p.name||p.id}));}catch(e){console.error(e);return [];}}
+    async function fetchDepartures(stopId){ if(!stopId) return; const now=new Date().toISOString().replace(/[-:]/g,"").split(".")[0]; const url=`https://api.sncf.com/v1/coverage/sncf/stop_areas/${encodeURIComponent(stopId)}/departures?datetime=${now}&count=200`; try{ const res=await fetch(url,{headers:{Authorization:"Basic "+btoa(API_KEY+":")}}); if(!res.ok){ boardBody.innerHTML=`<div class="no-data">Erreur API: ${res.status}</div>`; return;} const json=await res.json(); lastDepartures=json.departures||[]; renderBoard(lastDepartures);}catch(e){console.error(e);boardBody.innerHTML=`<div class="no-data">Erreur de connexion</div>`;}}
 
-    function parseHHMMfromNavitia(ts) {
-      if (!ts || ts.length < 13) return null;
-      const hh = parseInt(ts.slice(9,11), 10);
-      const mm = parseInt(ts.slice(11,13), 10);
-      if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
-      return ((hh % 24) * 60) + (mm % 60);
-    }
-
-    function minutesToHHhMM(mins) {
-      mins = ((mins % (24*60)) + (24*60)) % (24*60);
-      const hh = Math.floor(mins / 60);
-      const mm = mins % 60;
-      return String(hh).padStart(2, '0') + 'h' + String(mm).padStart(2, '0');
-    }
-
-    function addMinutesToNavitia(ts, addMinutes) {
-      const baseM = parseHHMMfromNavitia(ts);
-      if (baseM === null) return null;
-      return minutesToHHhMM(baseM + addMinutes);
-    }
-
-    async function searchStations(q) {
-      if (!q || q.trim().length < 2) return [];
-      const url = `https://api.sncf.com/v1/coverage/sncf/places?q=${encodeURIComponent(q)}&type[]=stop_area&count=50`;
-      try {
-        const res = await fetch(url, { headers: { Authorization: "Basic " + btoa(API_KEY + ":") } });
-        if (!res.ok) return [];
-        const json = await res.json();
-        return (json.places || []).map(p => ({
-          id: p.id,
-          label: p.stop_area?.label || p.name || p.id
-        }));
-      } catch(e){ console.error(e); return [];}
-    }
-
-    async function fetchDepartures(stopId) {
-      if (!stopId) return;
-      const now = new Date().toISOString().replace(/[-:]/g,"").split(".")[0];
-      const url = `https://api.sncf.com/v1/coverage/sncf/stop_areas/${encodeURIComponent(stopId)}/departures?datetime=${now}&count=200`;
-      try {
-        const res = await fetch(url, { headers: { Authorization: "Basic " + btoa(API_KEY + ":") } });
-        if (!res.ok) { boardBody.innerHTML = `<div class="no-data">Erreur API: ${res.status}</div>`; return; }
-        const json = await res.json();
-        lastDepartures = json.departures || [];
-        renderBoard(lastDepartures);
-      } catch(e){ console.error(e); boardBody.innerHTML = `<div class="no-data">Erreur de connexion</div>`;}
-    }
-
-    function getLogoHTML(trainType, network) {
-      let logo = "";
-      let infoText = "";
-      if(trainType.toUpperCase().includes("TER")) { logo="logo/ter.svg"; infoText=(network || "").toUpperCase(); }
-      else if(trainType.toUpperCase().includes("TGV")) logo="logo/inoui.svg"; 
-      else if(trainType.toUpperCase().includes("OUIGO")) logo="logo/ouigo.svg";
-      else if(trainType.toUpperCase().includes("RER")) logo="logo/rer.svg";
-      else if(trainType.toUpperCase().includes("TRANSILIEN")) logo="logo/transilien.svg";
-      else if(trainType.toUpperCase().includes("INTERCITÉS")) logo="logo/intercite.svg";
-      if(logo) {
-        let bgStyle = (trainType.toUpperCase().includes("RER") || trainType.toUpperCase().includes("TRANSILIEN")) ? 'background:#fff;padding:2px;border-radius:3px;' : '';
-        return `<img src="${logo}" class="train-logo" style="${bgStyle}"/>` + (infoText ? `<span class="train-logo-text">${escapeHtml(infoText)}</span>` : "");
-      }
-      return escapeHtml(trainType);
-    }
-
-    function renderBoard(departures) {
+    function renderBoard(departures){
       const typeFilter = trainTypeSelect.value;
-      const rows = [];
-
-      departures.forEach((dep) => {
-        const info = dep.display_informations || {};
-        const st = dep.stop_date_time || {};
-        const mission = info.headsign || info.code || info.trip_short_name || info.name || info.label || "—";
-        const line = info.code || (info.network && info.network.name) || "?";
-        const baseTs = st.base_departure_date_time || null;
-        const realTs = st.departure_date_time || null;
-        const delaySeconds = st.departure_delay || 0;
-        const delayMinutesFromField = Math.floor((delaySeconds || 0)/60);
-        const canceled = st.cancelled || false;
-
+      const rows=[];
+      departures.forEach((dep)=>{
+        const info=dep.display_informations||{};
+        const st=dep.stop_date_time||{};
+        const mission=info.headsign||info.code||info.trip_short_name||info.name||info.label||"—";
+        const line=info.code||"?";
+        const baseTs=st.base_departure_date_time||null;
+        const realTs=st.departure_date_time||null;
+        const delayM=Math.floor((st.departure_delay||0)/60);
         let delayed=false, originalDisplay=null, newDisplay=null;
-        if(canceled) { originalDisplay=formatTimeFromNavitia(realTs); newDisplay="supprimé"; }
-        else if(baseTs && realTs && baseTs!==realTs) { delayed=true; originalDisplay=formatTimeFromNavitia(baseTs); newDisplay=formatTimeFromNavitia(realTs);}
-        else if(baseTs && delayMinutesFromField>0) { delayed=true; originalDisplay=formatTimeFromNavitia(baseTs); newDisplay=addMinutesToNavitia(baseTs, delayMinutesFromField);}
-        else { originalDisplay=formatTimeFromNavitia(realTs||baseTs); }
+        if(baseTs && realTs && baseTs!==realTs){ delayed=true; originalDisplay=formatTimeFromNavitia(baseTs); newDisplay=formatTimeFromNavitia(realTs);}
+        else if(baseTs && delayM>0){ delayed=true; originalDisplay=formatTimeFromNavitia(baseTs); newDisplay=addMinutesToNavitia(baseTs,delayM)||formatTimeFromNavitia(realTs||baseTs);}
+        else if(!baseTs && realTs && delayM>0){ delayed=true; newDisplay=formatTimeFromNavitia(realTs); const rm=parseHHMMfromNavitia(realTs); originalDisplay=rm!==null?minutesToHHhMM(rm-delayM):"—";}
+        else{ delayed=false; originalDisplay=formatTimeFromNavitia(realTs||baseTs); newDisplay=null;}
 
-        const commercial = (info.commercial_mode || info.physical_mode || "").toString();
-        const trainType = commercial || "Autre";
-
-        const matchType = typeFilter==="all" || (commercial && commercial.toUpperCase().includes(typeFilter.toUpperCase()));
+        const commercial=(info.commercial_mode||info.physical_mode||"").toString();
+        const trainType=commercial||"Autre";
+        const matchType=typeFilter==="all" || (commercial&&commercial.toUpperCase().includes(typeFilter.toUpperCase()));
         if(!matchType) return;
-
-        rows.push({ line, mission, destination: escapeHtml(info.direction||"—"), originalDisplay, newDisplay, delayed, canceled, color: info.color ? ("#"+info.color) : "#0052a3", trainType, network: info.network ? info.network.name : ""});
+        const missionEsc=escapeHtml(mission);
+        const destination=escapeHtml(info.direction||(dep.terminus&&dep.terminus.name)||"—");
+        const color=info.color?("#"+info.color):"#0052a3";
+        const canceled=info.status && info.status.toLowerCase().includes("cancelled");
+        // формируем логотип и текст
+        let logoHtml="", textHtml="";
+        if(trainType.toUpperCase().includes("TER")){ logoHtml='<img src="logo/ter.svg" class="train-logo transilien" alt="TER">'; textHtml='<span class="train-logo-text">HDF</span>'; }
+        else if(trainType.toUpperCase().includes("TGV") && info.commercial_mode?.toUpperCase().includes("INOU")){ logoHtml='<img src="logo/inoui.svg" class="train-logo" alt="Inoui">'; textHtml='TGV Inoui';}
+        else if(trainType.toUpperCase().includes("TGV") && info.commercial_mode?.toUpperCase().includes("OUI")){ logoHtml='<img src="logo/ouigo.svg" class="train-logo" alt="Ouigo">'; textHtml='TGV Ouigo';}
+        else if(trainType.toUpperCase().includes("INTER")){ logoHtml='<img src="logo/intercite.svg" class="train-logo" alt="Intercités">'; textHtml='Intercités';}
+        else if(trainType.toUpperCase().includes("RER")){ logoHtml='<img src="logo/rer.svg" class="train-logo rer" alt="RER">'; textHtml='RER';}
+        else if(trainType.toUpperCase().includes("TRANS")){ logoHtml='<img src="logo/transilien.svg" class="train-logo transilien" alt="Transilien">'; textHtml='Transilien';}
+        else{ textHtml=escapeHtml(trainType);}
+        rows.push({line,lineEsc:escapeHtml(line),missionEsc,destination,originalDisplay,newDisplay,delayed,color,logoHtml,textHtml,canceled});
       });
-
-      if(!rows.length) { boardBody.innerHTML=`<div class="no-data">Aucun départ après filtrage.</div>`; return;}
-
-      boardBody.innerHTML = rows.map((r,i)=>{
-        const rowClass = (i%2===0)?"train-row row-light":"train-row row-dark";
-        let timeCell = "";
-        if(r.canceled) timeCell=`<span class="original-time canceled-time">${r.originalDisplay}</span><span class="delayed-time canceled-text">${r.newDisplay}</span>`;
-        else if(r.delayed) timeCell=`<div class="time-with-delay"><span class="original-time">${r.originalDisplay}</span><span class="delayed-time">${r.newDisplay}</span></div>`;
-        else timeCell=`<span class="on-time">${r.originalDisplay}</span>`;
-
+      if(!rows.length){ boardBody.innerHTML=`<div class="no-data">Aucun départ après filtrage.</div>`; return;}
+      boardBody.innerHTML=rows.map((r,i)=>{
+        const rowClass=(i%2===0)?"train-row row-light":"train-row row-dark";
+        const timeCell=r.canceled?`<span class="canceled-time">${r.originalDisplay||"—"}</span>`:
+          r.delayed?`<span class="original-time">${r.originalDisplay}</span><span class="delayed-time">${r.newDisplay}</span>`:
+          `<span class="on-time">${r.originalDisplay}</span>`;
+        const typeCell=r.logoHtml ? `<div class="col-type">${r.logoHtml} ${r.textHtml}</div>`:`<div class="col-type">${r.textHtml}</div>`;
         return `<div class="${rowClass}">
-          <div class="col-line"><span class="line-badge" style="background:${r.color}">${r.line}</span></div>
-          <div class="col-mission">${escapeHtml(r.mission)}</div>
+          <div class="col-line"><span class="line-badge" style="background-color:${r.color}">${r.lineEsc}</span></div>
+          <div class="col-mission">${r.missionEsc}</div>
           <div class="col-destination">${r.destination}</div>
-          <div class="col-time">${timeCell}</div>
-          <div class="col-type">${getLogoHTML(r.trainType,r.network)}</div>
+          <div class="col-time"><div class="time-with-delay">${timeCell}</div></div>
+          ${typeCell}
         </div>`;
-      }).join("");
+      }).join("\n");
     }
 
-    let debounceTimer=null;
-    stationInput.addEventListener("input",(e)=>{
-      const q=e.target.value.trim();
-      clearTimeout(debounceTimer);
-      suggestionsBox.innerHTML=""; suggestionsBox.style.display="none";
-      if(!q||q.length<2) return;
-      debounceTimer=setTimeout(async()=>{
-        const res=await searchStations(q);
-        if(!res.length){ suggestionsBox.innerHTML=`<div class="suggestion-empty">Aucun résultat</div>`; suggestionsBox.style.display="block"; return; }
-        suggestionsBox.innerHTML=res.map(s=>`<div class="suggestion-item" data-id="${s.id}">${escapeHtml(s.label)}</div>`).join("");
-        suggestionsBox.style.display="block";
-      },300);
+    stationInput.addEventListener("input",async(e)=>{
+      const val=e.target.value;
+      if(!val){ suggestionsBox.style.display="none"; return;}
+      const results=await searchStations(val);
+      suggestionsBox.innerHTML=results.length?results.map(r=>`<div class="suggestion-item" data-id="${r.id}">${r.label}</div>`).join(""):'<div class="suggestion-empty">Aucun résultat</div>';
+      suggestionsBox.style.display="block";
     });
 
-    suggestionsBox.addEventListener("click",(ev)=>{
-      const el = ev.target.closest(".suggestion-item");
-      if(!el) return;
-      const id = el.dataset.id;
-      const label = el.textContent;
-      stationInput.value = label;
-      suggestionsBox.innerHTML=""; suggestionsBox.style.display="none";
-      currentStation={id,label};
+    suggestionsBox.addEventListener("click",(e)=>{
+      const target=e.target.closest(".suggestion-item");
+      if(!target) return;
+      const id=target.dataset.id;
+      const label=target.textContent;
+      stationInput.value=label;
+      suggestionsBox.style.display="none";
+      currentStation=id;
       fetchDepartures(id);
     });
 
-    trainTypeSelect.addEventListener("change",()=>renderBoard(lastDepartures));
-    refreshBtn.addEventListener("click",()=>{ if(currentStation && currentStation.id) fetchDepartures(currentStation.id); });
-    setInterval(()=>{ if(currentStation && currentStation.id) fetchDepartures(currentStation.id); },60000);
+    refreshBtn.addEventListener("click",()=>{ if(currentStation) fetchDepartures(currentStation); });
+
   </script>
 </body>
 </html>
