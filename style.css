@@ -1,4 +1,10 @@
-@import url('https://fonts.cdnfonts.com/css/parisine-std');
+@font-face {
+  font-family: 'Parisine Std';
+  src: url('./Parisine Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+}
+
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -243,3 +249,4 @@ body {
 }
 .row-light { background: #003875; }
 .row-dark { background: #0052a3; }
+
