@@ -81,8 +81,8 @@ async function fetchVehicleJourneyDetails(vehicleJourneyId) {
     try {
         console.log("Fetching vehicle journey details for:", vehicleJourneyId);
 
-        // Use your proxy
-        const vehicleJourneyUrl = `${API_PROXY}?id=${encodeURIComponent(vehicleJourneyId)}`;
+        // Use proxy, but DO NOT encode ID
+        const vehicleJourneyUrl = `${API_PROXY}?id=${vehicleJourneyId}`;
         console.log("Proxy API URL:", vehicleJourneyUrl);
 
         const vehicleJourneyRes = await fetch(vehicleJourneyUrl);
@@ -98,18 +98,8 @@ async function fetchVehicleJourneyDetails(vehicleJourneyId) {
 
         console.log("Found vehicle journey:", vehicleJourney);
 
-        // Now fetch stop_times
-        const stopTimesUrl = `${API_PROXY}?id=${encodeURIComponent(vehicleJourneyId)}`;
-        console.log("Stop times URL:", stopTimesUrl);
-
-        const stopTimesRes = await fetch(stopTimesUrl);
-        if (!stopTimesRes.ok) {
-            throw new Error(`Erreur API stop_times: ${stopTimesRes.status}`);
-        }
-
-        const stopTimesData = await stopTimesRes.json();
-
-        displayVehicleJourneyInfo(vehicleJourney, stopTimesData);
+        // Display stops directly from vehicle_journey object
+        displayVehicleJourneyInfo(vehicleJourney, vehicleJourney);
     } catch (error) {
         console.error('Error fetching vehicle journey details:', error);
         showError(error.message);
@@ -305,4 +295,5 @@ if (vehicleJourneyId) {
     showError('Aucun identifiant de vehicle journey spécifié');
     console.log("No vehicle journey ID found in URL");
 }
+
 
