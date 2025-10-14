@@ -4,7 +4,7 @@ const API_PROXY = "https://api.dmytrothemir.workers.dev";
 function getVehicleJourneyIdFromURL() {
     const search = window.location.search;
     if (!search) return null;
-    const vehicleJourneyId = search.substring(1);
+    const vehicleJourneyId = search.substring(1); // Remove '?'
     console.log("Raw vehicle_journey ID from URL:", vehicleJourneyId);
     return vehicleJourneyId;
 }
@@ -26,6 +26,7 @@ function escapeHtml(s = "") {
     return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+// HHMMSS → HH:MM
 function formatTimeFromHHMMSS(ts) {
     if (!ts || ts.length < 6) return "--:--";
     const hh = ts.slice(0,2);
@@ -33,6 +34,7 @@ function formatTimeFromHHMMSS(ts) {
     return `${hh}:${mm}`;
 }
 
+// HHMMSS → minutes since midnight
 function parseHHMMfromHHMMSS(ts) {
     if (!ts || ts.length < 6) return null;
     const hh = parseInt(ts.slice(0,2), 10);
@@ -40,18 +42,20 @@ function parseHHMMfromHHMMSS(ts) {
     return hh * 60 + mm;
 }
 
-
+// Calculate delay
 function getDelayStatus(baseTime, actualTime) {
     if (!baseTime || !actualTime) return { status: 'unknown', delay: 0 };
-    const baseMinutes = parseHHMMfromNavitia(baseTime);
-    const actualMinutes = parseHHMMfromNavitia(actualTime);
+    const baseMinutes = parseHHMMfromHHMMSS(baseTime);
+    const actualMinutes = parseHHMMfromHHMMSS(actualTime);
     if (baseMinutes === null || actualMinutes === null) return { status: 'unknown', delay: 0 };
+
     let delay = actualMinutes - baseMinutes;
     if (delay < -12 * 60) delay += 24 * 60;
     if (delay > 12 * 60) delay -= 24 * 60;
+
     if (delay === 0) return { status: 'on-time', delay: 0 };
     if (delay > 0) return { status: 'delayed', delay };
-    if (delay < 0) return { status: 'early', delay: Math.abs(delay) };
+    return { status: 'early', delay: Math.abs(delay) };
 }
 
 function getStatusText(status, delay) {
@@ -74,7 +78,7 @@ function getStatusClass(status) {
     }
 }
 
-// Fetch vehicle journey details — via Cloudflare proxy
+// Fetch vehicle journey details
 async function fetchVehicleJourneyDetails(vehicleJourneyId) {
     if (!vehicleJourneyId) {
         showError('ID de vehicle journey manquant');
@@ -84,7 +88,7 @@ async function fetchVehicleJourneyDetails(vehicleJourneyId) {
     try {
         console.log("Fetching vehicle journey details for:", vehicleJourneyId);
 
-        // Use proxy, but DO NOT encode ID
+        // Proxy URL, no encoding
         const vehicleJourneyUrl = `${API_PROXY}?id=${vehicleJourneyId}`;
         console.log("Proxy API URL:", vehicleJourneyUrl);
 
@@ -95,6 +99,7 @@ async function fetchVehicleJourneyDetails(vehicleJourneyId) {
 
         const vehicleJourneyData = await vehicleJourneyRes.json();
         const vehicleJourney = vehicleJourneyData.vehicle_journeys?.[0];
+
         if (!vehicleJourney) {
             throw new Error('Vehicle journey non trouvé');
         }
@@ -109,6 +114,7 @@ async function fetchVehicleJourneyDetails(vehicleJourneyId) {
     }
 }
 
+// Display info
 function displayVehicleJourneyInfo(vehicleJourney, stopTimesData) {
     const name = vehicleJourney.name || 'Train sans nom';
     const number = vehicleJourney.code || vehicleJourney.name || '--';
@@ -120,58 +126,46 @@ function displayVehicleJourneyInfo(vehicleJourney, stopTimesData) {
 
     if (vehicleJourney.codes) {
         const coachCountCode = vehicleJourney.codes.find(c => c.type === 'coach_count');
-        if (coachCountCode) {
-            coachInfoElement.textContent = `${coachCountCode.value} voitures`;
-        } else {
-            coachInfoElement.textContent = 'Info voitures non disponible';
-        }
+        coachInfoElement.textContent = coachCountCode ? `${coachCountCode.value} voitures` : 'Info voitures non disponible';
     } else {
         coachInfoElement.textContent = 'Info voitures non disponible';
     }
 
-    const stopTimes = processStopTimes(stopTimesData);
+    const stopTimes = processStopTimes(vehicleJourney.stop_times || []);
     displayStopTimes(stopTimes);
     updateOverallStatus(stopTimes);
 
     if (stopTimes.length >= 2) {
-        const origin = stopTimes[0].stopName;
-        const destination = stopTimes[stopTimes.length - 1].stopName;
-        tripRouteElement.textContent = `${origin} → ${destination}`;
+        tripRouteElement.textContent = `${stopTimes[0].stopName} → ${stopTimes[stopTimes.length-1].stopName}`;
     }
 }
 
-function processStopTimes(stopTimesData) {
-    const stopTimes = [];
-    const stopTimesList = stopTimesData.stop_times;
-    if (!stopTimesList || !stopTimesList.length) return stopTimes;
-
-    stopTimesList.forEach(stopTime => {
-        const stopPoint = stopTime.stop_point;
-        if (!stopPoint) return;
+// Process stop_times array
+function processStopTimes(stopTimesArray) {
+    return stopTimesArray.map(stopTime => {
+        const stopPoint = stopTime.stop_point || {};
         const stopName = stopPoint.name || stopPoint.label || 'Arrêt inconnu';
         const baseArrival = stopTime.arrival_time;
         const baseDeparture = stopTime.departure_time;
-        const actualArrival = stopTime.arrival_time;
-        const actualDeparture = stopTime.departure_time;
-        const arrivalStatus = getDelayStatus(baseArrival, actualArrival, parseHHMMfromHHMMSS);
-        const departureStatus = getDelayStatus(baseDeparture, actualDeparture, parseHHMMfromHHMMSS);
+        const actualArrival = baseArrival; // No separate realtime for now
+        const actualDeparture = baseDeparture;
 
-        stopTimes.push({
+        return {
             stopName,
             baseArrival,
             baseDeparture,
             actualArrival,
             actualDeparture,
-            arrivalStatus,
-            departureStatus,
+            arrivalStatus: getDelayStatus(baseArrival, actualArrival),
+            departureStatus: getDelayStatus(baseDeparture, actualDeparture),
             platform: stopPoint.platform_code || '--'
-        });
+        };
     });
-    return stopTimes;
 }
 
+// Display stops in DOM
 function displayStopTimes(stopTimes) {
-    if (stopTimes.length === 0) {
+    if (!stopTimes.length) {
         timelineStopsElement.innerHTML = '<div class="text-center py-4">Aucun horaire disponible</div>';
         return;
     }
@@ -183,10 +177,14 @@ function displayStopTimes(stopTimes) {
     timelineStopsElement.innerHTML = stopTimes.map((stop, index) => {
         const isFirst = index === 0;
         const isLast = index === stopTimes.length - 1;
+
+        let isCurrent = false;
         let markerClass = 'future';
+
         if (!foundCurrent) {
-            const departureTime = parseHHMMfromNavitia(stop.actualDeparture || stop.baseDeparture);
+            const departureTime = parseHHMMfromHHMMSS(stop.actualDeparture || stop.baseDeparture);
             if (departureTime !== null && currentTime <= departureTime) {
+                isCurrent = true;
                 foundCurrent = true;
                 markerClass = 'current';
             } else {
@@ -196,6 +194,7 @@ function displayStopTimes(stopTimes) {
 
         const arrivalTime = formatTimeFromHHMMSS(stop.actualArrival || stop.baseArrival);
         const departureTime = formatTimeFromHHMMSS(stop.actualDeparture || stop.baseDeparture);
+
         const arrivalStatus = getStatusText(stop.arrivalStatus.status, stop.arrivalStatus.delay);
         const departureStatus = getStatusText(stop.departureStatus.status, stop.departureStatus.delay);
         const arrivalStatusClass = getStatusClass(stop.arrivalStatus.status);
@@ -204,11 +203,11 @@ function displayStopTimes(stopTimes) {
         return `
             <div class="timeline-stop">
                 <div class="stop-marker ${markerClass}"></div>
-                <div class="stop-content ${markerClass === 'current' ? 'current' : ''}">
+                <div class="stop-content ${isCurrent ? 'current' : ''}">
                     <div class="stop-header">
                         <div class="stop-name">${escapeHtml(stop.stopName)}</div>
                         <div class="stop-time">
-                            ${isFirst ? `Départ: ${departureTime}` :
+                            ${isFirst ? `Départ: ${departureTime}` : 
                               isLast ? `Arrivée: ${arrivalTime}` :
                               `${arrivalTime} - ${departureTime}`}
                         </div>
@@ -216,11 +215,11 @@ function displayStopTimes(stopTimes) {
                     <div class="stop-details">
                         <div class="stop-platform">Voie ${stop.platform}</div>
                         <div class="stop-status">
-                            ${isFirst ?
+                            ${isFirst ? 
                                 `<span class="${departureStatusClass}">${departureStatus}</span>` :
                               isLast ?
                                 `<span class="${arrivalStatusClass}">${arrivalStatus}</span>` :
-                                `<span class="${arrivalStatusClass}">${arrivalStatus}</span> /
+                                `<span class="${arrivalStatusClass}">${arrivalStatus}</span> / 
                                  <span class="${departureStatusClass}">${departureStatus}</span>`}
                         </div>
                     </div>
@@ -230,8 +229,9 @@ function displayStopTimes(stopTimes) {
     }).join('');
 }
 
+// Update status badge
 function updateOverallStatus(stopTimes) {
-    if (stopTimes.length === 0) {
+    if (!stopTimes.length) {
         statusBadgeElement.textContent = 'Information manquante';
         return;
     }
@@ -240,65 +240,25 @@ function updateOverallStatus(stopTimes) {
     const currentTime = now.getHours() * 60 + now.getMinutes();
     let nextStop = null;
 
-    for (let i = 0; i < stopTimes.length; i++) {
-        const stop = stopTimes[i];
-        const departureTime = parseHHMMfromNavitia(stop.actualDeparture || stop.baseDeparture);
-        if (departureTime !== null && currentTime <= departureTime) {
+    for (let stop of stopTimes) {
+        const depTime = parseHHMMfromHHMMSS(stop.actualDeparture || stop.baseDeparture);
+        if (depTime !== null && depTime >= currentTime) {
             nextStop = stop;
             break;
         }
     }
 
     if (nextStop) {
-        const status = nextStop.departureStatus.status;
-        const delay = nextStop.departureStatus.delay;
-        switch (status) {
-            case 'on-time':
-                statusBadgeElement.textContent = 'À l\'heure';
-                statusBadgeElement.style.background = '#00b341';
-                break;
-            case 'delayed':
-                statusBadgeElement.textContent = `Retardé (+${delay} min)`;
-                statusBadgeElement.style.background = '#ff9500';
-                break;
-            case 'early':
-                statusBadgeElement.textContent = `En avance (-${delay} min)`;
-                statusBadgeElement.style.background = '#00b4ff';
-                break;
-            default:
-                statusBadgeElement.textContent = 'En circulation';
-                statusBadgeElement.style.background = '#0052a3';
-        }
-        nextStopElement.textContent = nextStop.stopName;
+        nextStopElement.textContent = `Prochain arrêt: ${nextStop.stopName} (${formatTimeFromHHMMSS(nextStop.actualDeparture || nextStop.baseDeparture)})`;
     } else {
-        statusBadgeElement.textContent = 'Terminé';
-        statusBadgeElement.style.background = '#666';
-        nextStopElement.textContent = 'Terminus';
+        nextStopElement.textContent = 'Fin du trajet';
     }
 }
 
-function showError(message) {
-    timelineStopsElement.innerHTML = `
-        <div class="text-center py-4">
-            <div class="error-message" style="color: #ff6b6b; font-weight: 600;">
-                ${escapeHtml(message)}
-            </div>
-            <button onclick="window.history.back()" class="btn btn-outline-light mt-3">
-                Retour aux départs
-            </button>
-        </div>
-    `;
+// Show error
+function showError(msg) {
+    timelineStopsElement.innerHTML = `<div class="text-center py-4 text-red-500 font-bold">${escapeHtml(msg)}</div>`;
 }
 
-// Initialize
-if (vehicleJourneyId) {
-    console.log("Loading vehicle journey details for:", vehicleJourneyId);
-    fetchVehicleJourneyDetails(vehicleJourneyId);
-} else {
-    showError('Aucun identifiant de vehicle journey spécifié');
-    console.log("No vehicle journey ID found in URL");
-}
-
-
-
-
+// Start
+fetchVehicleJourneyDetails(vehicleJourneyId);
