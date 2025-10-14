@@ -1,14 +1,10 @@
 const API_KEY = "e41a2be9-7450-4f1a-a7e6-eb429950186f";
 
-// Get vehicle_journey ID from URL - CORRECTED
+// Get vehicle_journey ID from URL
 function getVehicleJourneyIdFromURL() {
     const search = window.location.search;
     if (!search) return null;
-    
-    // Remove the '?' and get the vehicleJourneyId
-    // Don't decode here - we want the raw ID for API call
     const vehicleJourneyId = search.substring(1);
-    
     console.log("Raw vehicle_journey ID from URL:", vehicleJourneyId);
     return vehicleJourneyId;
 }
@@ -44,17 +40,12 @@ function parseHHMMfromNavitia(ts) {
 
 function getDelayStatus(baseTime, actualTime) {
     if (!baseTime || !actualTime) return { status: 'unknown', delay: 0 };
-    
     const baseMinutes = parseHHMMfromNavitia(baseTime);
     const actualMinutes = parseHHMMfromNavitia(actualTime);
-    
     if (baseMinutes === null || actualMinutes === null) return { status: 'unknown', delay: 0 };
-    
     let delay = actualMinutes - baseMinutes;
-    // Handle overnight trips
     if (delay < -12 * 60) delay += 24 * 60;
     if (delay > 12 * 60) delay -= 24 * 60;
-    
     if (delay === 0) return { status: 'on-time', delay: 0 };
     if (delay > 0) return { status: 'delayed', delay };
     if (delay < 0) return { status: 'early', delay: Math.abs(delay) };
@@ -80,7 +71,18 @@ function getStatusClass(status) {
     }
 }
 
-// Fetch vehicle journey details - CORRECTED API CALL
+// 🧩 Новый кусок — очистка Realtime ID
+function cleanVehicleJourneyId(id) {
+    const realtimeIndex = id.indexOf(":RealTime:");
+    if (realtimeIndex !== -1) {
+        const cleaned = id.substring(0, realtimeIndex);
+        console.log(`Cleaned vehicle_journey ID: ${cleaned}`);
+        return cleaned;
+    }
+    return id;
+}
+
+// Fetch vehicle journey details
 async function fetchVehicleJourneyDetails(vehicleJourneyId) {
     if (!vehicleJourneyId) {
         showError('ID de vehicle journey manquant');
@@ -90,8 +92,10 @@ async function fetchVehicleJourneyDetails(vehicleJourneyId) {
     try {
         console.log("Fetching vehicle journey details for:", vehicleJourneyId);
         
-        // CORRECTED: Use vehicle_journeys endpoint with proper encoding
-        const vehicleJourneyUrl = `https://api.sncf.com/v1/coverage/sncf/vehicle_journeys/${vehicleJourneyId}`;
+        // 👇 очищаем realtime-часть перед запросом
+        const cleanedId = cleanVehicleJourneyId(vehicleJourneyId);
+
+        const vehicleJourneyUrl = `https://api.sncf.com/v1/coverage/sncf/vehicle_journeys/${cleanedId}`;
         console.log("API URL:", vehicleJourneyUrl);
         
         const vehicleJourneyRes = await fetch(vehicleJourneyUrl, {
@@ -111,8 +115,8 @@ async function fetchVehicleJourneyDetails(vehicleJourneyId) {
 
         console.log("Found vehicle journey:", vehicleJourney);
 
-        // Get stop times using the same vehicle_journey ID
-        const stopTimesUrl = `https://api.sncf.com/v1/coverage/sncf/vehicle_journeys/${vehicleJourneyId}/stop_times`;
+        // Stop times
+        const stopTimesUrl = `https://api.sncf.com/v1/coverage/sncf/vehicle_journeys/${cleanedId}/stop_times`;
         console.log("Stop times URL:", stopTimesUrl);
         
         const stopTimesRes = await fetch(stopTimesUrl, {
@@ -133,7 +137,6 @@ async function fetchVehicleJourneyDetails(vehicleJourneyId) {
 }
 
 function displayVehicleJourneyInfo(vehicleJourney, stopTimesData) {
-    // Basic vehicle journey info
     const name = vehicleJourney.name || 'Train sans nom';
     const number = vehicleJourney.code || vehicleJourney.name || '--';
     const commercialMode = vehicleJourney.commercial_mode?.name || 'Train';
@@ -142,7 +145,6 @@ function displayVehicleJourneyInfo(vehicleJourney, stopTimesData) {
     tripNameElement.textContent = name;
     tripTypeElement.textContent = commercialMode;
 
-    // Try to get coach information
     if (vehicleJourney.codes) {
         const coachCountCode = vehicleJourney.codes.find(c => c.type === 'coach_count');
         if (coachCountCode) {
@@ -154,12 +156,10 @@ function displayVehicleJourneyInfo(vehicleJourney, stopTimesData) {
         coachInfoElement.textContent = 'Info voitures non disponible';
     }
 
-    // Process stop times
     const stopTimes = processStopTimes(stopTimesData);
     displayStopTimes(stopTimes);
     updateOverallStatus(stopTimes);
     
-    // Set route info
     if (stopTimes.length >= 2) {
         const origin = stopTimes[0].stopName;
         const destination = stopTimes[stopTimes.length - 1].stopName;
@@ -177,14 +177,13 @@ function processStopTimes(stopTimesData) {
 
     stopTimesList.forEach(stopTime => {
         const stopPoint = stopTime.stop_point;
-        
         if (!stopPoint) return;
 
         const stopName = stopPoint.name || stopPoint.label || 'Arrêt inconnu';
         const baseArrival = stopTime.arrival_time;
         const baseDeparture = stopTime.departure_time;
-        const actualArrival = stopTime.arrival_time; // Use same as base for now
-        const actualDeparture = stopTime.departure_time; // Use same as base for now
+        const actualArrival = stopTime.arrival_time;
+        const actualDeparture = stopTime.departure_time;
         
         const arrivalStatus = getDelayStatus(baseArrival, actualArrival);
         const departureStatus = getDelayStatus(baseDeparture, actualDeparture);
@@ -219,7 +218,6 @@ function displayStopTimes(stopTimes) {
         const isFirst = index === 0;
         const isLast = index === stopTimes.length - 1;
         
-        // Determine if this is the current stop
         let isCurrent = false;
         let markerClass = 'future';
         
@@ -263,8 +261,7 @@ function displayStopTimes(stopTimes) {
                               isLast ?
                                 `<span class="${arrivalStatusClass}">${arrivalStatus}</span>` :
                                 `<span class="${arrivalStatusClass}">${arrivalStatus}</span> / 
-                                 <span class="${departureStatusClass}">${departureStatus}</span>`
-                            }
+                                 <span class="${departureStatusClass}">${departureStatus}</span>`}
                         </div>
                     </div>
                 </div>
@@ -279,7 +276,6 @@ function updateOverallStatus(stopTimes) {
         return;
     }
 
-    // Find current or next stop
     const now = new Date();
     const currentTime = now.getHours() * 60 + now.getMinutes();
     
@@ -299,7 +295,6 @@ function updateOverallStatus(stopTimes) {
         }
     }
     
-    // Update status badge
     if (nextStop) {
         const status = nextStop.departureStatus.status;
         const delay = nextStop.departureStatus.delay;
@@ -326,7 +321,6 @@ function updateOverallStatus(stopTimes) {
         statusBadgeElement.style.background = '#666';
     }
     
-    // Update next stop
     if (nextStop) {
         nextStopElement.textContent = nextStop.stopName;
     } else if (stopTimes.length > 0) {
@@ -347,7 +341,7 @@ function showError(message) {
     `;
 }
 
-// Initialize the page
+// Initialize
 if (vehicleJourneyId) {
     console.log("Loading vehicle journey details for:", vehicleJourneyId);
     fetchVehicleJourneyDetails(vehicleJourneyId);
