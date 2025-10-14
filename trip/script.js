@@ -116,7 +116,7 @@ async function fetchVehicleJourneyDetails(vehicleJourneyId) {
         console.log("Found vehicle journey:", vehicleJourney);
 
         // Stop times
-        const stopTimesUrl = `https://api.sncf.com/v1/coverage/sncf/vehicle_journeys/${cleanedId}/stop_times`;
+        const stopTimesUrl = `https://api.sncf.com/v1/coverage/sncf/vehicle_journeys/${cleanedId}`;
         console.log("Stop times URL:", stopTimesUrl);
         
         const stopTimesRes = await fetch(stopTimesUrl, {
@@ -349,3 +349,4 @@ if (vehicleJourneyId) {
     showError('Aucun identifiant de vehicle journey spécifié');
     console.log("No vehicle journey ID found in URL");
 }
+
