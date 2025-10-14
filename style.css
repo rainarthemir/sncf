@@ -1,6 +1,6 @@
 @font-face {
   font-family: 'Parisine Std';
-  src: url('./Parisine Regular.otf') format('opentype');
+  src: url('./Parisine Regular.woff') format('opentype');
   font-weight: 400;
   font-style: normal;
 }
@@ -249,4 +249,5 @@ body {
 }
 .row-light { background: #003875; }
 .row-dark { background: #0052a3; }
+
 
