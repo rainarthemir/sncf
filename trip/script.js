@@ -26,17 +26,20 @@ function escapeHtml(s = "") {
     return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-function formatTimeFromNavitia(ts) {
-    if (!ts || ts.length < 13) return "--:--";
-    return ts.slice(9, 11) + ":" + ts.slice(11, 13);
+function formatTimeFromHHMMSS(ts) {
+    if (!ts || ts.length < 6) return "--:--";
+    const hh = ts.slice(0,2);
+    const mm = ts.slice(2,4);
+    return `${hh}:${mm}`;
 }
 
-function parseHHMMfromNavitia(ts) {
-    if (!ts || ts.length < 13) return null;
-    const hh = parseInt(ts.slice(9, 11), 10);
-    const mm = parseInt(ts.slice(11, 13), 10);
-    return (hh % 24) * 60 + (mm % 60);
+function parseHHMMfromHHMMSS(ts) {
+    if (!ts || ts.length < 6) return null;
+    const hh = parseInt(ts.slice(0,2), 10);
+    const mm = parseInt(ts.slice(2,4), 10);
+    return hh * 60 + mm;
 }
+
 
 function getDelayStatus(baseTime, actualTime) {
     if (!baseTime || !actualTime) return { status: 'unknown', delay: 0 };
@@ -150,8 +153,8 @@ function processStopTimes(stopTimesData) {
         const baseDeparture = stopTime.departure_time;
         const actualArrival = stopTime.arrival_time;
         const actualDeparture = stopTime.departure_time;
-        const arrivalStatus = getDelayStatus(baseArrival, actualArrival);
-        const departureStatus = getDelayStatus(baseDeparture, actualDeparture);
+        const arrivalStatus = getDelayStatus(baseArrival, actualArrival, parseHHMMfromHHMMSS);
+        const departureStatus = getDelayStatus(baseDeparture, actualDeparture, parseHHMMfromHHMMSS);
 
         stopTimes.push({
             stopName,
@@ -191,8 +194,8 @@ function displayStopTimes(stopTimes) {
             }
         }
 
-        const arrivalTime = formatTimeFromNavitia(stop.actualArrival || stop.baseArrival);
-        const departureTime = formatTimeFromNavitia(stop.actualDeparture || stop.baseDeparture);
+        const arrivalTime = formatTimeFromHHMMSS(stop.actualArrival || stop.baseArrival);
+        const departureTime = formatTimeFromHHMMSS(stop.actualDeparture || stop.baseDeparture);
         const arrivalStatus = getStatusText(stop.arrivalStatus.status, stop.arrivalStatus.delay);
         const departureStatus = getStatusText(stop.departureStatus.status, stop.departureStatus.delay);
         const arrivalStatusClass = getStatusClass(stop.arrivalStatus.status);
@@ -295,5 +298,6 @@ if (vehicleJourneyId) {
     showError('Aucun identifiant de vehicle journey spécifié');
     console.log("No vehicle journey ID found in URL");
 }
+
 
 
