@@ -99,7 +99,7 @@ async function fetchVehicleJourneyDetails(vehicleJourneyId) {
         console.log("Found vehicle journey:", vehicleJourney);
 
         // Now fetch stop_times
-        const stopTimesUrl = `${API_PROXY}?id=${encodeURIComponent(vehicleJourneyId + "/stop_times")}`;
+        const stopTimesUrl = `${API_PROXY}?id=${encodeURIComponent(vehicleJourneyId)}`;
         console.log("Stop times URL:", stopTimesUrl);
 
         const stopTimesRes = await fetch(stopTimesUrl);
@@ -305,3 +305,4 @@ if (vehicleJourneyId) {
     showError('Aucun identifiant de vehicle journey spécifié');
     console.log("No vehicle journey ID found in URL");
 }
+
