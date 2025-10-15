@@ -79,40 +79,50 @@ function getStatusClass(status) {
 }
 
 // Fetch vehicle journey details
+// Fetch vehicle journey details (with fallback for RealTime)
 async function fetchVehicleJourneyDetails(vehicleJourneyId) {
     if (!vehicleJourneyId) {
         showError('ID de vehicle journey manquant');
         return;
     }
 
-    try {
-        console.log("Fetching vehicle journey details for:", vehicleJourneyId);
-
-        // Proxy URL, no encoding
-        const vehicleJourneyUrl = `${API_PROXY}?id=${vehicleJourneyId}`;
+    const tryFetch = async (id, isFallback = false) => {
+        console.log(`Fetching vehicle journey details for${isFallback ? " (fallback)" : ""}:`, id);
+        const vehicleJourneyUrl = `${API_PROXY}?id=${id}`;
         console.log("Proxy API URL:", vehicleJourneyUrl);
 
-        const vehicleJourneyRes = await fetch(vehicleJourneyUrl);
-        if (!vehicleJourneyRes.ok) {
-            throw new Error(`Erreur API: ${vehicleJourneyRes.status} - ${await vehicleJourneyRes.text()}`);
+        const res = await fetch(vehicleJourneyUrl);
+        const text = await res.text();
+        if (!res.ok) {
+            // SNCF errors often come as JSON with "error"
+            let json;
+            try { json = JSON.parse(text); } catch {}
+            if (json?.error?.id === "unknown_object" && !isFallback && id.includes(":RealTime:")) {
+                const fallbackId = id.split(":RealTime:")[0];
+                console.warn("Realtime ID not found, retrying with fallback:", fallbackId);
+                return await tryFetch(fallbackId, true);
+            }
+            throw new Error(`Erreur API: ${res.status} - ${text}`);
         }
+        return JSON.parse(text);
+    };
 
-        const vehicleJourneyData = await vehicleJourneyRes.json();
-        const vehicleJourney = vehicleJourneyData.vehicle_journeys?.[0];
+    try {
+        const data = await tryFetch(vehicleJourneyId);
+        const vehicleJourney = data.vehicle_journeys?.[0];
 
         if (!vehicleJourney) {
             throw new Error('Vehicle journey non trouvé');
         }
 
         console.log("Found vehicle journey:", vehicleJourney);
-
-        // Display stops directly from vehicle_journey object
         displayVehicleJourneyInfo(vehicleJourney, vehicleJourney);
     } catch (error) {
         console.error('Error fetching vehicle journey details:', error);
         showError(error.message);
     }
 }
+
 
 // Display info
 function displayVehicleJourneyInfo(vehicleJourney, stopTimesData) {
@@ -262,3 +272,4 @@ function showError(msg) {
 
 // Start
 fetchVehicleJourneyDetails(vehicleJourneyId);
+
