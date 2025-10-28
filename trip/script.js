@@ -1,17 +1,17 @@
 const API_PROXY = "https://api.dmytrothemir.workers.dev";
 
-// Get vehicle_journey ID from URL
+// Получаем ID vehicle_journey из URL
 function getVehicleJourneyIdFromURL() {
     const search = window.location.search;
     if (!search) return null;
-    const vehicleJourneyId = search.substring(1); // Remove '?'
+    const vehicleJourneyId = search.substring(1); // убираем '?'
     console.log("Raw vehicle_journey ID from URL:", vehicleJourneyId);
     return vehicleJourneyId;
 }
 
 const vehicleJourneyId = getVehicleJourneyIdFromURL();
 
-// DOM elements
+// DOM элементы
 const tripNumberElement = document.getElementById('tripNumber');
 const tripNameElement = document.getElementById('tripName');
 const tripRouteElement = document.getElementById('tripRoute');
@@ -21,7 +21,7 @@ const timelineStopsElement = document.getElementById('timelineStops');
 const statusBadgeElement = document.getElementById('statusBadge');
 const nextStopElement = document.getElementById('nextStop');
 
-// Utility functions
+// Утилиты
 function escapeHtml(s = "") {
     return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
@@ -34,7 +34,7 @@ function formatTimeFromHHMMSS(ts) {
     return `${hh}:${mm}`;
 }
 
-// HHMMSS → minutes since midnight
+// HHMMSS → минуты с полуночи
 function parseHHMMfromHHMMSS(ts) {
     if (!ts || ts.length < 6) return null;
     const hh = parseInt(ts.slice(0,2), 10);
@@ -42,7 +42,7 @@ function parseHHMMfromHHMMSS(ts) {
     return hh * 60 + mm;
 }
 
-// Calculate delay
+// Вычисляем задержку
 function getDelayStatus(baseTime, actualTime) {
     if (!baseTime || !actualTime) return { status: 'unknown', delay: 0 };
     const baseMinutes = parseHHMMfromHHMMSS(baseTime);
@@ -78,8 +78,7 @@ function getStatusClass(status) {
     }
 }
 
-// Fetch vehicle journey details
-// Fetch vehicle journey details (with fallback for RealTime)
+// Загружаем vehicle_journey
 async function fetchVehicleJourneyDetails(vehicleJourneyId) {
     if (!vehicleJourneyId) {
         showError('ID de vehicle journey manquant');
@@ -94,7 +93,6 @@ async function fetchVehicleJourneyDetails(vehicleJourneyId) {
         const res = await fetch(vehicleJourneyUrl);
         const text = await res.text();
         if (!res.ok) {
-            // SNCF errors often come as JSON with "error"
             let json;
             try { json = JSON.parse(text); } catch {}
             if (json?.error?.id === "unknown_object" && !isFallback && id.includes(":RealTime:")) {
@@ -116,16 +114,15 @@ async function fetchVehicleJourneyDetails(vehicleJourneyId) {
         }
 
         console.log("Found vehicle journey:", vehicleJourney);
-        displayVehicleJourneyInfo(vehicleJourney, vehicleJourney);
+        displayVehicleJourneyInfo(vehicleJourney);
     } catch (error) {
         console.error('Error fetching vehicle journey details:', error);
         showError(error.message);
     }
 }
 
-
-// Display info
-function displayVehicleJourneyInfo(vehicleJourney, stopTimesData) {
+// Отображаем основную информацию
+function displayVehicleJourneyInfo(vehicleJourney) {
     const name = vehicleJourney.name || 'Train sans nom';
     const number = vehicleJourney.code || vehicleJourney.name || '--';
     const commercialMode = vehicleJourney.commercial_mode?.name || 'Train';
@@ -150,15 +147,15 @@ function displayVehicleJourneyInfo(vehicleJourney, stopTimesData) {
     }
 }
 
-// Process stop_times array
+// Обработка массива stop_times
 function processStopTimes(stopTimesArray) {
     return stopTimesArray.map(stopTime => {
         const stopPoint = stopTime.stop_point || {};
         const stopName = stopPoint.name || stopPoint.label || 'Arrêt inconnu';
-        const baseArrival = stopTime.arrival_time;
-        const baseDeparture = stopTime.departure_time;
-        const actualArrival = baseArrival; // No separate realtime for now
-        const actualDeparture = baseDeparture;
+        const baseArrival = stopTime.base_arrival_time || stopTime.arrival_time;
+        const baseDeparture = stopTime.base_departure_time || stopTime.departure_time;
+        const actualArrival = stopTime.amended_arrival_time || baseArrival;
+        const actualDeparture = stopTime.amended_departure_time || baseDeparture;
 
         return {
             stopName,
@@ -173,7 +170,7 @@ function processStopTimes(stopTimesArray) {
     });
 }
 
-// Display stops in DOM
+// Вывод остановок
 function displayStopTimes(stopTimes) {
     if (!stopTimes.length) {
         timelineStopsElement.innerHTML = '<div class="text-center py-4">Aucun horaire disponible</div>';
@@ -202,8 +199,23 @@ function displayStopTimes(stopTimes) {
             }
         }
 
-        const arrivalTime = formatTimeFromHHMMSS(stop.actualArrival || stop.baseArrival);
-        const departureTime = formatTimeFromHHMMSS(stop.actualDeparture || stop.baseDeparture);
+        // Формат времени с выделением задержки
+        const renderTime = (base, amended) => {
+            if (!base) return "--:--";
+            const baseFmt = formatTimeFromHHMMSS(base);
+            const amendedFmt = formatTimeFromHHMMSS(amended);
+            if (base !== amended) {
+                return `
+                    <span style="color:#c00;text-decoration:line-through;">${baseFmt}</span>
+                    <span style="color:#e8a500;font-weight:bold;margin-left:6px;">${amendedFmt}</span>
+                `;
+            } else {
+                return `<span>${baseFmt}</span>`;
+            }
+        };
+
+        const arrivalTime = renderTime(stop.baseArrival, stop.actualArrival);
+        const departureTime = renderTime(stop.baseDeparture, stop.actualDeparture);
 
         const arrivalStatus = getStatusText(stop.arrivalStatus.status, stop.arrivalStatus.delay);
         const departureStatus = getStatusText(stop.departureStatus.status, stop.departureStatus.delay);
@@ -239,7 +251,7 @@ function displayStopTimes(stopTimes) {
     }).join('');
 }
 
-// Update status badge
+// Статус маршрута и следующая остановка
 function updateOverallStatus(stopTimes) {
     if (!stopTimes.length) {
         statusBadgeElement.textContent = 'Information manquante';
@@ -265,11 +277,10 @@ function updateOverallStatus(stopTimes) {
     }
 }
 
-// Show error
+// Показ ошибки
 function showError(msg) {
     timelineStopsElement.innerHTML = `<div class="text-center py-4 text-red-500 font-bold">${escapeHtml(msg)}</div>`;
 }
 
-// Start
+// Старт
 fetchVehicleJourneyDetails(vehicleJourneyId);
-
