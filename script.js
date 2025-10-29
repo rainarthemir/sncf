@@ -8,17 +8,16 @@ const refreshBtn = document.getElementById("refreshBtn");
 let currentStation = null;
 let lastDepartures = [];
 
-// Utility functions
+// Utility
 function escapeHtml(s = "") {
     return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
-
 function formatTimeFromNavitia(ts) {
     if (!ts || ts.length < 13) return "—";
     return ts.slice(9, 11) + "h" + ts.slice(11, 13);
 }
 
-// Station search
+// Search station
 async function searchStations(q) {
     if (!q || q.trim().length < 2) return [];
     const url = `https://api.sncf.com/v1/coverage/sncf/places?q=${encodeURIComponent(q)}&type[]=stop_area&count=50`;
@@ -26,7 +25,10 @@ async function searchStations(q) {
         const res = await fetch(url, { headers: { Authorization: "Basic " + btoa(API_KEY + ":") } });
         if (!res.ok) return [];
         const json = await res.json();
-        return (json.places || []).map(p => ({ id: p.id, label: p.stop_area?.label || p.name || p.id }));
+        return (json.places || []).map(p => ({
+            id: p.id,
+            label: p.stop_area?.label || p.name || p.id
+        }));
     } catch (e) {
         console.error(e);
         return [];
@@ -38,6 +40,7 @@ async function fetchDepartures(stopId) {
     if (!stopId) return;
     const now = new Date().toISOString().replace(/[-:]/g, "").split(".")[0];
     const url = `https://api.sncf.com/v1/coverage/sncf/stop_areas/${encodeURIComponent(stopId)}/departures?datetime=${now}&count=200`;
+
     try {
         const res = await fetch(url, { headers: { Authorization: "Basic " + btoa(API_KEY + ":") } });
         if (!res.ok) {
@@ -53,9 +56,10 @@ async function fetchDepartures(stopId) {
     }
 }
 
-// Render board with clickable rows
+// Render departures board
 function renderBoard(departures) {
     const typeFilter = trainTypeSelect.value;
+    const isMobile = window.innerWidth < 768;
 
     if (!departures.length) {
         boardBody.innerHTML = `<div class="no-data">Aucun départ trouvé</div>`;
@@ -73,24 +77,21 @@ function renderBoard(departures) {
         return;
     }
 
-    const isMobile = window.innerWidth < 768;
-
     boardBody.innerHTML = filteredDepartures.map((dep, index) => {
         const info = dep.display_informations || {};
         const st = dep.stop_date_time || {};
 
-        // vehicle_journey ID
         let vehicleJourneyId = dep.vehicle_journey?.id;
         if (!vehicleJourneyId && dep.links) {
-            const vehicleJourneyLink = dep.links.find(link => link.type === "vehicle_journey");
-            vehicleJourneyId = vehicleJourneyLink ? vehicleJourneyLink.id : null;
+            const link = dep.links.find(l => l.type === "vehicle_journey");
+            if (link) vehicleJourneyId = link.id;
         }
 
         const mission = info.headsign || info.code || info.trip_short_name || info.name || info.label || "—";
         const line = info.code || "?";
         const lineDisplay = line === "?" ? (info.commercial_mode || "—") : line;
 
-        // === Очистка названия города (в скобках) для мобильной версии ===
+        // Clean destination for mobile (remove parentheses)
         let destination = info.direction || (dep.terminus && dep.terminus.name) || "—";
         if (isMobile && destination.includes("(")) {
             destination = destination.replace(/\s*\([^)]*\)/g, "").trim();
@@ -117,44 +118,45 @@ function renderBoard(departures) {
         } else {
             delayed = false;
             originalDisplay = formatTimeFromNavitia(realTs || baseTs);
-            newDisplay = null;
         }
 
-        const commercial = (info.commercial_mode || info.physical_mode || "").toString();
-        const trainType = commercial || "Autre";
-
+        // === LOGO DETECTION ===
+        const trainMode = (info.commercial_mode || info.physical_mode || info.network || "").toUpperCase();
         let logoHtml = "", textHtml = "";
-        if (trainType.toUpperCase().includes("TER")) {
+
+        if (trainMode.includes("TER")) {
             logoHtml = '<img src="logo/ter.svg" class="train-logo" alt="TER">';
             textHtml = '<span class="train-logo-text">TER</span>';
-        } else if (trainType.toUpperCase().includes("TGV") && info.commercial_mode?.toUpperCase().includes("INOU")) {
-            logoHtml = '<img src="logo/inoui.svg" class="train-logo" alt="Inoui">';
-            textHtml = 'TGV Inoui';
-        } else if (trainType.toUpperCase().includes("TGV") && info.commercial_mode?.toUpperCase().includes("OUI")) {
+        } else if (trainMode.includes("INOUI")) {
+            logoHtml = '<img src="logo/inoui.svg" class="train-logo" alt="TGV Inoui">';
+            textHtml = '<span class="train-logo-text">TGV Inoui</span>';
+        } else if (trainMode.includes("OUIGO") || trainMode.includes("CLASSIQUE")) {
             logoHtml = '<img src="logo/ouigo.svg" class="train-logo" alt="Ouigo">';
-            textHtml = 'TGV Ouigo';
-        } else if (trainType.toUpperCase().includes("INTER")) {
-            logoHtml = '<img src="logo/intercite.svg" class="train-logo" alt="Intercités">';
-            textHtml = 'Intercités';
-        } else if (trainType.toUpperCase().includes("RER")) {
-            logoHtml = '<img src="logo/rer.svg" class="train-logo" alt="RER">';
-            textHtml = 'RER';
-        } else if (trainType.toUpperCase().includes("TRANS")) {
+            textHtml = '<span class="train-logo-text">TGV Ouigo</span>';
+        } else if (trainMode.includes("INTERCIT")) {
+            logoHtml = '<img src="logo/intercites.svg" class="train-logo" alt="Intercités">';
+            textHtml = '<span class="train-logo-text">Intercités</span>';
+        } else if (trainMode.includes("TRANS")) {
             logoHtml = '<img src="logo/transilien.svg" class="train-logo" alt="Transilien">';
-            textHtml = 'Transilien';
+            textHtml = '<span class="train-logo-text">Transilien</span>';
+        } else if (trainMode.includes("RER")) {
+            logoHtml = '<img src="logo/rer.svg" class="train-logo" alt="RER">';
+            textHtml = '<span class="train-logo-text">RER</span>';
+        } else if (trainMode.includes("DB")) {
+            logoHtml = '<img src="logo/dbsncf.svg" class="train-logo" alt="DB SNCF">';
+            textHtml = '<span class="train-logo-text">DB-SNCF</span>';
+        } else if (trainMode.includes("EUROSTAR")) {
+            logoHtml = '<img src="logo/eurostar.svg" class="train-logo" alt="Eurostar">';
+            textHtml = '<span class="train-logo-text">Eurostar</span>';
         } else {
-            textHtml = escapeHtml(trainType);
+            textHtml = `<span class="train-logo-text">${escapeHtml(info.commercial_mode || "Autre")}</span>`;
         }
 
-        const timeCell = canceled ? 
-            `<span class="canceled-time">${originalDisplay || "—"}</span>` :
-            delayed ? 
-                `<span class="original-time">${originalDisplay}</span><span class="delayed-time">${newDisplay}</span>` :
-                `<span class="on-time">${originalDisplay}</span>`;
-
-        const typeCell = logoHtml ? 
-            `<div class="col-type">${logoHtml} ${textHtml}</div>` :
-            `<div class="col-type">${textHtml}</div>`;
+        const timeCell = canceled
+            ? `<span class="canceled-time">${originalDisplay || "—"}</span>`
+            : delayed
+                ? `<span class="original-time">${originalDisplay}</span><span class="delayed-time">${newDisplay}</span>`
+                : `<span class="on-time">${originalDisplay}</span>`;
 
         const rowClass = index % 2 === 0 ? "train-row row-light" : "train-row row-dark";
         const clickableClass = vehicleJourneyId ? "clickable-train-row" : "";
@@ -166,12 +168,12 @@ function renderBoard(departures) {
                 <div class="col-mission">${escapeHtml(mission)}</div>
                 <div class="col-destination">${escapeHtml(destination)}</div>
                 <div class="col-time"><div class="time-with-delay">${timeCell}</div></div>
-                ${typeCell}
+                <div class="col-type">${logoHtml} ${textHtml}</div>
             </div>
         `;
     }).join("");
 
-    // Add click listeners
+    // Make rows clickable
     document.querySelectorAll('.clickable-train-row').forEach(row => {
         const newRow = row.cloneNode(true);
         row.parentNode.replaceChild(newRow, row);
@@ -182,7 +184,6 @@ function renderBoard(departures) {
     });
 }
 
-
 // Event listeners
 stationInput.addEventListener("input", async (e) => {
     const val = e.target.value;
@@ -191,9 +192,9 @@ stationInput.addEventListener("input", async (e) => {
         return;
     }
     const results = await searchStations(val);
-    suggestionsBox.innerHTML = results.length ? 
-        results.map(r => `<div class="suggestion-item" data-id="${r.id}">${r.label}</div>`).join("") : 
-        '<div class="suggestion-empty">Aucun résultat</div>';
+    suggestionsBox.innerHTML = results.length
+        ? results.map(r => `<div class="suggestion-item" data-id="${r.id}">${r.label}</div>`).join("")
+        : '<div class="suggestion-empty">Aucun résultat</div>';
     suggestionsBox.style.display = "block";
 });
 
@@ -213,7 +214,5 @@ refreshBtn.addEventListener("click", () => {
 });
 
 trainTypeSelect.addEventListener("change", () => {
-    if (lastDepartures.length > 0) {
-        renderBoard(lastDepartures);
-    }
+    if (lastDepartures.length > 0) renderBoard(lastDepartures);
 });
