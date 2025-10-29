@@ -44,21 +44,49 @@ async function searchStations(q) {
 // ===================== FETCH =====================
 async function fetchDepartures(stopId) {
   if (!stopId) return;
-  const now = new Date().toISOString().replace(/[-:]/g, "").split(".")[0];
+  const now = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Paris" })
+    .replace(/[-:T ]/g, "")
+    .slice(0, 14);
+
   const url = `https://api.sncf.com/v1/coverage/sncf/stop_areas/${encodeURIComponent(stopId)}/departures?datetime=${now}&count=200`;
+
   try {
-    const res = await fetch(url, { headers: { Authorization: "Basic " + btoa(API_KEY + ":") } });
+    console.log("🔹 Requête SNCF:", url);
+    const res = await fetch(url, {
+      headers: { Authorization: "Basic " + btoa(API_KEY + ":") }
+    });
+
+    console.log("🔹 Statut HTTP:", res.status);
+    const text = await res.text();
+    console.log("🔹 Réponse brute:", text.slice(0, 300)); // первые 300 символов
+
     if (!res.ok) {
       boardBody.innerHTML = `<div class="no-data">Erreur API: ${res.status}</div>`;
       return;
     }
-    const json = await res.json();
+
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch (err) {
+      console.error("❌ JSON invalide:", err);
+      boardBody.innerHTML = `<div class="no-data">Réponse non-JSON (${err.message})</div>`;
+      return;
+    }
+
+    if (!json.departures) {
+      console.warn("⚠️ Structure inattendue:", json);
+    }
+
     lastDepartures = json.departures || [];
     renderBoard(lastDepartures);
-  } catch {
-    boardBody.innerHTML = `<div class="no-data">Erreur de connexion</div>`;
+
+  } catch (err) {
+    console.error("❌ FETCH FAILED:", err);
+    boardBody.innerHTML = `<div class="no-data">Erreur de connexion<br>${err.message}</div>`;
   }
 }
+
 
 // ===================== RENDER =====================
 function renderBoard(departures) {
