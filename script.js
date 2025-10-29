@@ -135,7 +135,7 @@ function renderBoard(departures) {
       textHtml = 'TGV Inoui';
     } else if (commercial.includes("OUIGO")) {
       logoHtml = '<img src="logo/ouigo.svg" class="train-logo" alt="Ouigo">';
-      textHtml = 'TGV Ouigo';
+      textHtml = 'Ouigo';
     } else if (commercial.includes("INTERCIT")) {
       logoHtml = '<img src="logo/intercite.svg" class="train-logo" alt="Intercités">';
       textHtml = 'Intercités';
