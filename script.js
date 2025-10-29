@@ -124,30 +124,55 @@ function renderBoard(departures) {
     }
 
     // === LOGO DETECTION ===
-    const commercial = (info.commercial_mode || info.physical_mode || "").toUpperCase();
-    let logoHtml = "", textHtml = "";
+    // === LOGO DETECTION (исправленный порядок и логика) ===
+const commercial = (info.commercial_mode || info.physical_mode || "").toUpperCase();
+const lineText = (lineDisplay || "").toUpperCase();
+let logoHtml = "", textHtml = "";
 
-    if (commercial.includes("TER")) {
-      logoHtml = '<img src="logo/ter.svg" class="train-logo" alt="TER">';
-      textHtml = 'TER';
-    } else if (commercial.includes("INOUI")) {
-      logoHtml = '<img src="logo/inoui.svg" class="train-logo" alt="Inoui">';
-      textHtml = 'TGV Inoui';
-    } else if (commercial.includes("OUIGO")) {
-      logoHtml = '<img src="logo/ouigo.svg" class="train-logo" alt="Ouigo">';
-      textHtml = 'Ouigo';
-    } else if (commercial.includes("INTERCITÉS")) {
-      logoHtml = '<img src="logo/intercites.svg" class="train-logo" alt="Intercités">';
-      textHtml = 'Intercités';
-    } else if (commercial.includes("RER")) {
-      logoHtml = '<img src="logo/rer.svg" class="train-logo" alt="RER">';
-      textHtml = 'RER';
-    } else if (commercial.includes("TRANS")) {
-      logoHtml = '<img src="logo/transilien.svg" class="train-logo" alt="Transilien">';
-      textHtml = 'Transilien';
-    } else {
-      textHtml = escapeHtml(info.commercial_mode || "Autre");
-    }
+// 1️⃣ Intercités должен проверяться первым
+if (lineText.includes("INTERCITE") || commercial.includes("INTERCITE")) {
+  logoHtml = '<img src="logo/intercites.svg" class="train-logo" alt="Intercités">';
+  textHtml = 'Intercités';
+
+// 2️⃣ TGV Inoui
+} else if (commercial.includes("INOUI")) {
+  logoHtml = '<img src="logo/inoui.svg" class="train-logo" alt="Inoui">';
+  textHtml = 'TGV Inoui';
+
+// 3️⃣ Ouigo (включая Classique / GV)
+} else if (commercial.includes("OUIGO") || lineText.includes("OUIGO")) {
+  logoHtml = '<img src="logo/ouigo.svg" class="train-logo" alt="Ouigo">';
+  textHtml = 'Ouigo';
+
+// 4️⃣ Eurostar
+} else if (commercial.includes("EUROSTAR") || lineText.includes("EUROSTAR")) {
+  logoHtml = '<img src="logo/eurostar.svg" class="train-logo" alt="Eurostar">';
+  textHtml = 'Eurostar';
+
+// 5️⃣ DB SNCF
+} else if (commercial.includes("DB") || lineText.includes("DBSNCF")) {
+  logoHtml = '<img src="logo/dbsncf.svg" class="train-logo" alt="DB SNCF">';
+  textHtml = 'DB-SNCF';
+
+// 6️⃣ Transilien
+} else if (commercial.includes("TRANS") || lineText.includes("TRANSILIEN")) {
+  logoHtml = '<img src="logo/transilien.svg" class="train-logo" alt="Transilien">';
+  textHtml = 'Transilien';
+
+// 7️⃣ RER
+} else if (commercial.includes("RER") || lineText.includes("RER")) {
+  logoHtml = '<img src="logo/rer.svg" class="train-logo" alt="RER">';
+  textHtml = 'RER';
+
+// 8️⃣ TER (проверяется в самом конце, чтобы не конфликтовать с INTERCITÉS)
+} else if (commercial.includes("TER") || lineText.includes(" TER ")) {
+  logoHtml = '<img src="logo/ter.svg" class="train-logo" alt="TER">';
+  textHtml = 'TER';
+
+// 9️⃣ По умолчанию — текст
+} else {
+  textHtml = escapeHtml(info.commercial_mode || lineDisplay || "Autre");
+}
 
     const timeCell = canceled
       ? `<span class="canceled-time">${originalDisplay || "—"}</span>`
