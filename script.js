@@ -170,7 +170,7 @@ function renderBoard(departures) {
     } else if (LINE.includes("TRANSILIEN") || COMM.includes("TRANSILIEN") || COMM.includes("TRANS")) {
       logoHtml = '<img src="logo/transilien.svg" class="train-logo" alt="Transilien">';
       textHtml = 'Transilien';
-    } else if (LINE.includes(" RER ") || COMM.includes("RER") || /^RER[A-Z]$/.test(LINE)) {
+    } else if (LINE.includes("RER") || COMM.includes("RER") || /^RER[A-Z]$/.test(LINE)) {
       logoHtml = '<img src="logo/rer.svg" class="train-logo" alt="RER">';
       textHtml = 'RER';
     } else if (TER_WORD.test(' ' + LINE + ' ') || TER_WORD.test(' ' + COMM + ' ')) {
@@ -210,6 +210,7 @@ function renderBoard(departures) {
     });
   });
 }
+
 
 // ===================== EVENTS =====================
 stationInput.addEventListener("input", async e => {
