@@ -29,16 +29,16 @@ function escapeHtml(s = "") {
 // HHMMSS → HH:MM
 function formatTimeFromHHMMSS(ts) {
     if (!ts || ts.length < 6) return "--:--";
-    const hh = ts.slice(0,2);
-    const mm = ts.slice(2,4);
+    const hh = ts.slice(0, 2);
+    const mm = ts.slice(2, 4);
     return `${hh}:${mm}`;
 }
 
 // HHMMSS → минуты с полуночи
 function parseHHMMfromHHMMSS(ts) {
     if (!ts || ts.length < 6) return null;
-    const hh = parseInt(ts.slice(0,2), 10);
-    const mm = parseInt(ts.slice(2,4), 10);
+    const hh = parseInt(ts.slice(0, 2), 10);
+    const mm = parseInt(ts.slice(2, 4), 10);
     return hh * 60 + mm;
 }
 
@@ -94,7 +94,7 @@ async function fetchVehicleJourneyDetails(vehicleJourneyId) {
         const text = await res.text();
         if (!res.ok) {
             let json;
-            try { json = JSON.parse(text); } catch {}
+            try { json = JSON.parse(text); } catch { }
             if (json?.error?.id === "unknown_object" && !isFallback && id.includes(":RealTime:")) {
                 const fallbackId = id.split(":RealTime:")[0];
                 console.warn("Realtime ID not found, retrying with fallback:", fallbackId);
@@ -112,6 +112,32 @@ async function fetchVehicleJourneyDetails(vehicleJourneyId) {
         if (!vehicleJourney) {
             throw new Error('Vehicle journey non trouvé');
         }
+
+        // === ДОБАВЛЕННЫЙ БЛОК ДЛЯ ОПАЗДАНИЙ ===
+        if (data.disruptions && data.disruptions.length > 0) {
+            const impactedStops = data.disruptions[0]?.impacted_objects?.[0]?.impacted_stops || [];
+            if (impactedStops.length > 0) {
+                console.log("Merging disruption data into stop_times...");
+                const impactedMap = {};
+                for (const stop of impactedStops) {
+                    const name = stop.stop_point?.name;
+                    if (name) impactedMap[name] = stop;
+                }
+
+                vehicleJourney.stop_times = vehicleJourney.stop_times.map(st => {
+                    const matched = impactedMap[st.stop_point?.name];
+                    if (matched) {
+                        return {
+                            ...st,
+                            amended_arrival_time: matched.amended_arrival_time || st.arrival_time,
+                            amended_departure_time: matched.amended_departure_time || st.departure_time
+                        };
+                    }
+                    return st;
+                });
+            }
+        }
+        // === КОНЕЦ ДОБАВЛЕННОГО БЛОКА ===
 
         console.log("Found vehicle journey:", vehicleJourney);
         displayVehicleJourneyInfo(vehicleJourney);
@@ -143,7 +169,7 @@ function displayVehicleJourneyInfo(vehicleJourney) {
     updateOverallStatus(stopTimes);
 
     if (stopTimes.length >= 2) {
-        tripRouteElement.textContent = `${stopTimes[0].stopName} → ${stopTimes[stopTimes.length-1].stopName}`;
+        tripRouteElement.textContent = `${stopTimes[0].stopName} → ${stopTimes[stopTimes.length - 1].stopName}`;
     }
 }
 
@@ -170,7 +196,7 @@ function processStopTimes(stopTimesArray) {
     });
 }
 
-// Вывод остановок (исправленная версия)
+// Вывод остановок
 function displayStopTimes(stopTimes) {
     if (!stopTimes.length) {
         timelineStopsElement.innerHTML = '<div class="text-center py-4">Aucun horaire disponible</div>';
@@ -199,7 +225,7 @@ function displayStopTimes(stopTimes) {
             }
         }
 
-        // === Исправленный блок ===
+        // === Исправленный блок для отображения времени ===
         const renderTime = (base, amended) => {
             const cleanBase = (base || "").trim();
             const cleanAmended = (amended || "").trim();
@@ -209,7 +235,6 @@ function displayStopTimes(stopTimes) {
             const baseFmt = formatTimeFromHHMMSS(cleanBase);
             const amendedFmt = formatTimeFromHHMMSS(cleanAmended);
 
-            // Проверяем разницу по отформатированным значениям
             const timesDiffer = baseFmt !== amendedFmt && !!cleanAmended;
 
             if (!timesDiffer) {
@@ -238,19 +263,19 @@ function displayStopTimes(stopTimes) {
                     <div class="stop-header">
                         <div class="stop-name">${escapeHtml(stop.stopName)}</div>
                         <div class="stop-time">
-                            ${isFirst ? `Départ: ${departureTime}` : 
-                              isLast ? `Arrivée: ${arrivalTime}` :
-                              `${arrivalTime} - ${departureTime}`}
+                            ${isFirst ? `Départ: ${departureTime}` :
+                isLast ? `Arrivée: ${arrivalTime}` :
+                    `${arrivalTime} - ${departureTime}`}
                         </div>
                     </div>
                     <div class="stop-details">
                         <div class="stop-platform">Voie ${stop.platform}</div>
                         <div class="stop-status">
-                            ${isFirst ? 
-                                `<span class="${departureStatusClass}">${departureStatus}</span>` :
-                              isLast ?
-                                `<span class="${arrivalStatusClass}">${arrivalStatus}</span>` :
-                                `<span class="${arrivalStatusClass}">${arrivalStatus}</span> / 
+                            ${isFirst ?
+                `<span class="${departureStatusClass}">${departureStatus}</span>` :
+                isLast ?
+                    `<span class="${arrivalStatusClass}">${arrivalStatus}</span>` :
+                    `<span class="${arrivalStatusClass}">${arrivalStatus}</span> /
                                  <span class="${departureStatusClass}">${departureStatus}</span>`}
                         </div>
                     </div>
