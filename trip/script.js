@@ -170,7 +170,7 @@ function processStopTimes(stopTimesArray) {
     });
 }
 
-// Вывод остановок
+// Вывод остановок (исправленная версия)
 function displayStopTimes(stopTimes) {
     if (!stopTimes.length) {
         timelineStopsElement.innerHTML = '<div class="text-center py-4">Aucun horaire disponible</div>';
@@ -199,29 +199,29 @@ function displayStopTimes(stopTimes) {
             }
         }
 
-        // Формат времени с выделением задержки
-        // Формат времени с выделением задержки
-    const renderTime = (base, amended) => {
-        const cleanBase = (base || "").trim();
-        const cleanAmended = (amended || "").trim();
+        // === Исправленный блок ===
+        const renderTime = (base, amended) => {
+            const cleanBase = (base || "").trim();
+            const cleanAmended = (amended || "").trim();
 
-        if (!cleanBase) return "--:--";
+            if (!cleanBase) return "--:--";
 
-        const baseFmt = formatTimeFromHHMMSS(cleanBase);
-        const amendedFmt = formatTimeFromHHMMSS(cleanAmended);
+            const baseFmt = formatTimeFromHHMMSS(cleanBase);
+            const amendedFmt = formatTimeFromHHMMSS(cleanAmended);
 
-        // Если amended пустое или совпадает с base → показываем обычное время
-        if (!cleanAmended || cleanBase === cleanAmended) {
-        return `<span>${baseFmt}</span>`;
-    }
+            // Проверяем разницу по отформатированным значениям
+            const timesDiffer = baseFmt !== amendedFmt && !!cleanAmended;
 
-    // Если amended отличается → показываем зачёркнутое старое + новое жёлтым
-    return `
-        <span style="color:#c00;text-decoration:line-through;">${baseFmt}</span>
-        <span style="color:#e8a500;font-weight:bold;margin-left:6px;">${amendedFmt}</span>
-    `;
-};
+            if (!timesDiffer) {
+                return `<span>${baseFmt}</span>`;
+            }
 
+            return `
+                <span style="color:#c00;text-decoration:line-through;">${baseFmt}</span>
+                <span style="color:#e8a500;font-weight:bold;margin-left:6px;">${amendedFmt}</span>
+            `;
+        };
+        // === Конец исправленного блока ===
 
         const arrivalTime = renderTime(stop.baseArrival, stop.actualArrival);
         const departureTime = renderTime(stop.baseDeparture, stop.actualDeparture);
@@ -293,4 +293,3 @@ function showError(msg) {
 
 // Старт
 fetchVehicleJourneyDetails(vehicleJourneyId);
-
