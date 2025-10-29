@@ -51,45 +51,27 @@ async function fetchDepartures(stopId) {
   const url = `https://api.sncf.com/v1/coverage/sncf/stop_areas/${encodeURIComponent(stopId)}/departures?datetime=${now}&count=200`;
 
   try {
-    console.log("🔹 Requête SNCF:", url);
     const res = await fetch(url, {
       headers: { Authorization: "Basic " + btoa(API_KEY + ":") }
     });
-
-    console.log("🔹 Statut HTTP:", res.status);
-    const text = await res.text();
-    console.log("🔹 Réponse brute:", text.slice(0, 300)); // первые 300 символов
 
     if (!res.ok) {
       boardBody.innerHTML = `<div class="no-data">Erreur API: ${res.status}</div>`;
       return;
     }
 
-    let json;
-    try {
-      json = JSON.parse(text);
-    } catch (err) {
-      console.error("❌ JSON invalide:", err);
-      boardBody.innerHTML = `<div class="no-data">Réponse non-JSON (${err.message})</div>`;
+    const json = await res.json();
+    if (!json.departures) {
+      boardBody.innerHTML = `<div class="no-data">Aucun départ trouvé</div>`;
       return;
     }
 
-    if (!json.departures) {
-      console.warn("⚠️ Structure inattendue:", json);
-    }
-
-    console.log("✅ JSON reçu avec succès:", json);
-    console.log("👉 Départs:", json.departures?.length);
-
     lastDepartures = json.departures || [];
     renderBoard(lastDepartures);
-
   } catch (err) {
-    console.error("❌ FETCH FAILED:", err);
     boardBody.innerHTML = `<div class="no-data">Erreur de connexion<br>${err.message}</div>`;
   }
 }
-
 
 // ===================== RENDER =====================
 function renderBoard(departures) {
@@ -155,85 +137,48 @@ function renderBoard(departures) {
     }
 
     // === LOGO DETECTION ===
-    // === LOGO DETECTION (исправленный порядок и логика) ===
-  // === LOGO DETECTION — надёжная версия с нормализацией и логами ===
-  function norm(s = "") {
-    // убираем диакритики, в UPPERCASE, схлопываем пробелы
-    return s
-      .normalize('NFD')                 // разложить символы с диакритикой
-      .replace(/\p{Diacritic}/gu, '')   // убрать диакритики
-      .toUpperCase()
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
+    function norm(s = "") {
+      return s
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+        .toUpperCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
 
-  const commercialRaw = [info.commercial_mode, info.physical_mode, info.network].filter(Boolean).join(' ');
-  const codeRaw        = [lineDisplay, info.code, info.label, info.name].filter(Boolean).join(' ');
-  const COMM = norm(commercialRaw);
-  const LINE = norm(codeRaw);
+    const COMM = norm([info.commercial_mode, info.physical_mode, info.network].filter(Boolean).join(' '));
+    const LINE = norm([lineDisplay, info.code, info.label, info.name].filter(Boolean).join(' '));
+    const TER_WORD = /(^|[^A-Z])TER([^A-Z]|$)/;
 
-  // Регэксп, чтобы ловить TER как отдельное слово, а не внутри INTERCITES
-  const TER_WORD = /(^|[^A-Z])TER([^A-Z]|$)/;
+    let logoHtml = "", textHtml = "";
 
-  // Приоритет: INTERCITES → INOUI → OUIGO → EUROSTAR → DB SNCF → TRANSILIEN → RER → TER → текст
-  let logoHtml = "", textText = "";
-
-  // 1) Intercités: ищем в ЛИНИИ (как ты и хотел), плюс в commercial на всякий
-  if (LINE.includes("INTERCIT") || COMM.includes("INTERCIT")) {
-    logoHtml = '<img src="logo/intercites.svg" class="train-logo" alt="Intercités">';
-    textText = 'Intercités';
-
-  // 2) TGV Inoui
-  } else if (LINE.includes("INOUI") || COMM.includes("INOUI")) {
-    logoHtml = '<img src="logo/inoui.svg" class="train-logo" alt="Inoui">';
-    textText = 'TGV Inoui';
-
-  // 3) OUIGO (включая Classique / Train Classique / GV)
-  } else if (LINE.includes("OUIGO") || COMM.includes("OUIGO") || LINE.includes("CLASSIQUE")) {
-    logoHtml = '<img src="logo/ouigo.svg" class="train-logo" alt="Ouigo">';
-    textText = 'TGV Ouigo';
-
-  // 4) Eurostar
-  } else if (LINE.includes("EUROSTAR") || COMM.includes("EUROSTAR")) {
-    logoHtml = '<img src="logo/eurostar.svg" class="train-logo" alt="Eurostar">';
-    textText = 'Eurostar';
-
-  // 5) DB SNCF
-  } else if (LINE.includes("DB SNCF") || COMM.includes("DB")) {
-    logoHtml = '<img src="logo/dbsncf.svg" class="train-logo" alt="DB SNCF">';
-    textText = 'DB-SNCF';
-
-  // 6) Transilien
-  } else if (LINE.includes("TRANSILIEN") || COMM.includes("TRANSILIEN") || COMM.includes("TRANS")) {
-    logoHtml = '<img src="logo/transilien.svg" class="train-logo" alt="Transilien">';
-    textText = 'Transilien';
-
-  // 7) RER
-  } else if (LINE.includes(" RER ") || COMM.includes("RER") || /^RER[A-Z]$/.test(LINE)) {
-    logoHtml = '<img src="logo/rer.svg" class="train-logo" alt="RER">';
-    textText = 'RER';
-
-  // 8) TER — только как отдельное слово, чтобы не ловить INTERCITES
-  } else if (TER_WORD.test(' ' + LINE + ' ') || TER_WORD.test(' ' + COMM + ' ')) {
-    logoHtml = '<img src="logo/ter.svg" class="train-logo" alt="TER">';
-    textText = 'TER';
-
-  // 9) Фоллбек — просто текст (commercial_mode или Ligne)
-  } else {
-    textText = escapeHtml(info.commercial_mode || lineDisplay || "Autre");
-  }
-
-  // Для диагностики в консоль:
-  console.debug('[TYPE PICKED]', {
-    lineDisplay,
-    commercial_mode: info.commercial_mode,
-    label: info.label,
-    picked: textText
-  });
-
-// и далее уже используем:
-// <div class="col-type">${logoHtml} <span class="train-logo-text">${textText}</span></div>
-
+    if (LINE.includes("INTERCIT") || COMM.includes("INTERCIT")) {
+      logoHtml = '<img src="logo/intercites.svg" class="train-logo" alt="Intercités">';
+      textHtml = 'Intercités';
+    } else if (LINE.includes("INOUI") || COMM.includes("INOUI")) {
+      logoHtml = '<img src="logo/inoui.svg" class="train-logo" alt="Inoui">';
+      textHtml = 'TGV Inoui';
+    } else if (LINE.includes("OUIGO") || COMM.includes("OUIGO") || LINE.includes("CLASSIQUE")) {
+      logoHtml = '<img src="logo/ouigo.svg" class="train-logo" alt="Ouigo">';
+      textHtml = 'TGV Ouigo';
+    } else if (LINE.includes("EUROSTAR") || COMM.includes("EUROSTAR")) {
+      logoHtml = '<img src="logo/eurostar.svg" class="train-logo" alt="Eurostar">';
+      textHtml = 'Eurostar';
+    } else if (LINE.includes("DB SNCF") || COMM.includes("DB")) {
+      logoHtml = '<img src="logo/dbsncf.svg" class="train-logo" alt="DB SNCF">';
+      textHtml = 'DB-SNCF';
+    } else if (LINE.includes("TRANSILIEN") || COMM.includes("TRANSILIEN") || COMM.includes("TRANS")) {
+      logoHtml = '<img src="logo/transilien.svg" class="train-logo" alt="Transilien">';
+      textHtml = 'Transilien';
+    } else if (LINE.includes(" RER ") || COMM.includes("RER") || /^RER[A-Z]$/.test(LINE)) {
+      logoHtml = '<img src="logo/rer.svg" class="train-logo" alt="RER">';
+      textHtml = 'RER';
+    } else if (TER_WORD.test(' ' + LINE + ' ') || TER_WORD.test(' ' + COMM + ' ')) {
+      logoHtml = '<img src="logo/ter.svg" class="train-logo" alt="TER">';
+      textHtml = 'TER';
+    } else {
+      textHtml = escapeHtml(info.commercial_mode || lineDisplay || "Autre");
+    }
 
     const timeCell = canceled
       ? `<span class="canceled-time">${originalDisplay || "—"}</span>`
