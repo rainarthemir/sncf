@@ -130,7 +130,7 @@ const lineText = (lineDisplay || "").toUpperCase();
 let logoHtml = "", textHtml = "";
 
 // 1️⃣ Intercités должен проверяться первым
-if (lineText.includes("INTERCITE") || commercial.includes("INTERCITE")) {
+if (lineText.includes("INTERCITE") || commercial.includes("INTERCIT")) {
   logoHtml = '<img src="logo/intercites.svg" class="train-logo" alt="Intercités">';
   textHtml = 'Intercités';
 
@@ -164,12 +164,7 @@ if (lineText.includes("INTERCITE") || commercial.includes("INTERCITE")) {
   logoHtml = '<img src="logo/rer.svg" class="train-logo" alt="RER">';
   textHtml = 'RER';
 
-// 8️⃣ TER (проверяется в самом конце, чтобы не конфликтовать с INTERCITÉS)
-} else if (commercial.includes("TER") || lineText.includes(" TER ")) {
-  logoHtml = '<img src="logo/ter.svg" class="train-logo" alt="TER">';
-  textHtml = 'TER';
-
-// 9️⃣ По умолчанию — текст
+  // 9️⃣ По умолчанию — текст
 } else {
   textHtml = escapeHtml(info.commercial_mode || lineDisplay || "Autre");
 }
