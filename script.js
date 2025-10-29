@@ -125,49 +125,84 @@ function renderBoard(departures) {
 
     // === LOGO DETECTION ===
     // === LOGO DETECTION (исправленный порядок и логика) ===
-const commercial = (info.commercial_mode || info.physical_mode || "").toUpperCase();
-const lineText = (lineDisplay || "").toUpperCase();
-let logoHtml = "", textHtml = "";
+  // === LOGO DETECTION — надёжная версия с нормализацией и логами ===
+  function norm(s = "") {
+    // убираем диакритики, в UPPERCASE, схлопываем пробелы
+    return s
+      .normalize('NFD')                 // разложить символы с диакритикой
+      .replace(/\p{Diacritic}/gu, '')   // убрать диакритики
+      .toUpperCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
 
-// 1️⃣ Intercités должен проверяться первым
-if (lineText.includes("INTERCITE") || commercial.includes("INTERCIT")) {
-  logoHtml = '<img src="logo/intercites.svg" class="train-logo" alt="Intercités">';
-  textHtml = 'Intercités';
+  const commercialRaw = [info.commercial_mode, info.physical_mode, info.network].filter(Boolean).join(' ');
+  const codeRaw        = [lineDisplay, info.code, info.label, info.name].filter(Boolean).join(' ');
+  const COMM = norm(commercialRaw);
+  const LINE = norm(codeRaw);
 
-// 2️⃣ TGV Inoui
-} else if (commercial.includes("INOUI")) {
-  logoHtml = '<img src="logo/inoui.svg" class="train-logo" alt="Inoui">';
-  textHtml = 'TGV Inoui';
+  // Регэксп, чтобы ловить TER как отдельное слово, а не внутри INTERCITES
+  const TER_WORD = /(^|[^A-Z])TER([^A-Z]|$)/;
 
-// 3️⃣ Ouigo (включая Classique / GV)
-} else if (commercial.includes("OUIGO") || lineText.includes("OUIGO")) {
-  logoHtml = '<img src="logo/ouigo.svg" class="train-logo" alt="Ouigo">';
-  textHtml = 'Ouigo';
+  // Приоритет: INTERCITES → INOUI → OUIGO → EUROSTAR → DB SNCF → TRANSILIEN → RER → TER → текст
+  let logoHtml = "", textText = "";
 
-// 4️⃣ Eurostar
-} else if (commercial.includes("EUROSTAR") || lineText.includes("EUROSTAR")) {
-  logoHtml = '<img src="logo/eurostar.svg" class="train-logo" alt="Eurostar">';
-  textHtml = 'Eurostar';
+  // 1) Intercités: ищем в ЛИНИИ (как ты и хотел), плюс в commercial на всякий
+  if (LINE.includes("INTERCIT") || COMM.includes("INTERCIT")) {
+    logoHtml = '<img src="logo/intercites.svg" class="train-logo" alt="Intercités">';
+    textText = 'Intercités';
 
-// 5️⃣ DB SNCF
-} else if (commercial.includes("DB") || lineText.includes("DBSNCF")) {
-  logoHtml = '<img src="logo/dbsncf.svg" class="train-logo" alt="DB SNCF">';
-  textHtml = 'DB-SNCF';
+  // 2) TGV Inoui
+  } else if (LINE.includes("INOUI") || COMM.includes("INOUI")) {
+    logoHtml = '<img src="logo/inoui.svg" class="train-logo" alt="Inoui">';
+    textText = 'TGV Inoui';
 
-// 6️⃣ Transilien
-} else if (commercial.includes("TRANS") || lineText.includes("TRANSILIEN")) {
-  logoHtml = '<img src="logo/transilien.svg" class="train-logo" alt="Transilien">';
-  textHtml = 'Transilien';
+  // 3) OUIGO (включая Classique / Train Classique / GV)
+  } else if (LINE.includes("OUIGO") || COMM.includes("OUIGO") || LINE.includes("CLASSIQUE")) {
+    logoHtml = '<img src="logo/ouigo.svg" class="train-logo" alt="Ouigo">';
+    textText = 'TGV Ouigo';
 
-// 7️⃣ RER
-} else if (commercial.includes("RER") || lineText.includes("RER")) {
-  logoHtml = '<img src="logo/rer.svg" class="train-logo" alt="RER">';
-  textHtml = 'RER';
+  // 4) Eurostar
+  } else if (LINE.includes("EUROSTAR") || COMM.includes("EUROSTAR")) {
+    logoHtml = '<img src="logo/eurostar.svg" class="train-logo" alt="Eurostar">';
+    textText = 'Eurostar';
 
-  // 9️⃣ По умолчанию — текст
-} else {
-  textHtml = escapeHtml(info.commercial_mode || lineDisplay || "Autre");
-}
+  // 5) DB SNCF
+  } else if (LINE.includes("DB SNCF") || COMM.includes("DB")) {
+    logoHtml = '<img src="logo/dbsncf.svg" class="train-logo" alt="DB SNCF">';
+    textText = 'DB-SNCF';
+
+  // 6) Transilien
+  } else if (LINE.includes("TRANSILIEN") || COMM.includes("TRANSILIEN") || COMM.includes("TRANS")) {
+    logoHtml = '<img src="logo/transilien.svg" class="train-logo" alt="Transilien">';
+    textText = 'Transilien';
+
+  // 7) RER
+  } else if (LINE.includes(" RER ") || COMM.includes("RER") || /^RER[A-Z]$/.test(LINE)) {
+    logoHtml = '<img src="logo/rer.svg" class="train-logo" alt="RER">';
+    textText = 'RER';
+
+  // 8) TER — только как отдельное слово, чтобы не ловить INTERCITES
+  } else if (TER_WORD.test(' ' + LINE + ' ') || TER_WORD.test(' ' + COMM + ' ')) {
+    logoHtml = '<img src="logo/ter.svg" class="train-logo" alt="TER">';
+    textText = 'TER';
+
+  // 9) Фоллбек — просто текст (commercial_mode или Ligne)
+  } else {
+    textText = escapeHtml(info.commercial_mode || lineDisplay || "Autre");
+  }
+
+  // Для диагностики в консоль:
+  console.debug('[TYPE PICKED]', {
+    lineDisplay,
+    commercial_mode: info.commercial_mode,
+    label: info.label,
+    picked: textText
+  });
+
+// и далее уже используем:
+// <div class="col-type">${logoHtml} <span class="train-logo-text">${textText}</span></div>
+
 
     const timeCell = canceled
       ? `<span class="canceled-time">${originalDisplay || "—"}</span>`
