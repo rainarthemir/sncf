@@ -153,7 +153,7 @@ function renderBoard(departures) {
   let logoHtml = "", textHtml = "";
 
   // Intercités (только точные совпадения)
-  if (["INTERCITES", "INTERCITES DE NUIT"].includes(LINE) || ["INTERCITES", "INTERCITES DE NUIT"].includes(COMM)) {
+  if (["Intercités", "Intercités de nuit"].includes(LINE) || ["ntercités", "Intercités de nuit"].includes(COMM)) {
     logoHtml = '<img src="logo/intercites.svg" class="train-logo" alt="Intercités">';
     textHtml = 'Intercités';
 
