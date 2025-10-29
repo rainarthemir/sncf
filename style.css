@@ -5,7 +5,6 @@
   font-style: normal;
 }
 
-
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
@@ -23,7 +22,6 @@ body {
 .sncf-logo {
   font-size: 1.8rem;
   font-weight: 900;
-  letter-spacing: 1px;
   background: white;
   color: #002855;
   border-radius: 4px;
@@ -64,7 +62,6 @@ body {
 .suggestion-item {
   padding: 0.9rem 1rem;
   cursor: pointer;
-  transition: background 0.15s;
   color: #002855;
   font-weight: 700;
   border-bottom: 1px solid #e6eef8;
@@ -90,10 +87,7 @@ body {
   font-size: 0.85rem;
   font-weight: 900;
 }
-.board-body { 
-  padding: 0; 
-  cursor: default;
-}
+.board-body { padding: 0; cursor: default; }
 
 /* ROWS */
 .train-row {
@@ -102,79 +96,34 @@ body {
   gap: 1rem;
   padding: 0.85rem 1rem;
   align-items: center;
-  transition: all 0.2s ease;
 }
 .row-light { background: #003875; }
 .row-dark { background: #0052a3; }
 
 /* Clickable rows */
 .clickable-train-row {
-  cursor: pointer !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
-
 .clickable-train-row:hover {
   background: rgba(255, 255, 255, 0.15) !important;
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
   border-left: 4px solid #ffd700;
 }
-
 .clickable-train-row:active {
   transform: translateY(0);
   transition: transform 0.1s ease;
 }
 
-.col-line { 
-  display: flex; 
-  align-items: center; 
-  gap: 0.5rem; 
-}
-.line-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.4rem 0.6rem;
-  border-radius: 6px;
-  color: white;
-  font-weight: 900;
-  min-width: 46px;
-  transition: transform 0.2s ease;
-}
+/* Time styles */
+.time-with-delay { display: flex; gap: 0.5rem; }
+.original-time { color: #ff6b6b; text-decoration: line-through; }
+.delayed-time { color: #ffd700; font-weight: 900; }
+.on-time { color: #fff; font-weight: 900; }
+.canceled-time { color: #ff4d4d; text-decoration: line-through; }
 
-.clickable-train-row:hover .line-badge {
-  transform: scale(1.05);
-}
-
-.col-mission { 
-  font-weight: 800; 
-}
-.col-destination { 
-  font-weight: 700; 
-}
-.col-time { 
-  font-weight: 900; 
-}
-.time-with-delay { 
-  display: flex; 
-  gap: 0.5rem; 
-}
-.original-time { 
-  color: #ff6b6b; 
-  text-decoration: line-through; 
-}
-.delayed-time { 
-  color: #ffd700; 
-  font-weight: 900; 
-}
-.on-time { 
-  color: #fff; 
-  font-weight: 900; 
-}
-.canceled-time { 
-  color: #ff4d4d; 
-  text-decoration: line-through; 
-}
-
+/* Logos */
 .col-type {
   display: flex;
   align-items: center;
@@ -182,16 +131,19 @@ body {
   font-weight: 700;
   text-transform: capitalize;
 }
-.train-logo { 
-  height: 22px; 
-  width: auto; 
-  background: white; 
-  border-radius: 3px; 
-  padding: 2px; 
+.train-logo {
+  height: 22px;
+  background: white;
+  border-radius: 3px;
+  padding: 2px;
+  display: inline-block;
+  vertical-align: middle;
 }
-.train-logo-text { 
-  font-size: 0.85rem; 
-  color: #fff; 
+.train-logo-text {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #fff;
+  vertical-align: middle;
 }
 
 /* No data */
@@ -202,66 +154,10 @@ body {
   font-weight: 700;
 }
 
-/* RESPONSIVE */
-@media (max-width: 767.98px) {
-  .board { min-width: 100%; }
-  .board-header, .train-row {
-    grid-template-columns: 80px 1fr 100px;
-    font-size: 0.8rem;
-  }
-  .col-line, .col-time, .col-type { font-size: 0.75rem; }
-  .sncf-logo { font-size: 1.4rem; }
-  .header-title { font-size: 1.1rem; }
-  
-  .clickable-train-row:hover {
-    transform: none;
-    border-left: 2px solid #ffd700;
-  }
-}
-
-/* Добавьте эти стили в существующий CSS */
-
-.clickable-train-row {
-    cursor: pointer !important;
-    position: relative;
-    transition: all 0.2s ease;
-}
-
-.clickable-train-row:hover {
-    background: rgba(255, 255, 255, 0.15) !important;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-    border-left: 4px solid #ffd700;
-}
-
-.clickable-train-row:active {
-    transform: translateY(0);
-    transition: transform 0.1s ease;
-}
-
-/* Убедимся, что остальные стили для строк остаются */
-.train-row {
-    display: grid;
-    grid-template-columns: 100px 140px 1fr 220px 160px;
-    gap: 1rem;
-    padding: 0.85rem 1rem;
-    align-items: center;
-}
-.row-light { background: #003875; }
-.row-dark { background: #0052a3; }
 /* ===== MOBILE LAYOUT ===== */
 @media (max-width: 767.98px) {
-  body {
-    font-size: 0.9rem;
-  }
-
-  .board {
-    min-width: 100%;
-  }
-
-  .board-header {
-    display: none;
-  }
+  .board { min-width: 100%; }
+  .board-header { display: none; }
 
   .train-row {
     display: grid;
@@ -295,11 +191,5 @@ body {
     opacity: 0.9;
   }
 
-  .train-logo {
-    height: 18px;
-    padding: 1px;
-  }
+  .train-logo { height: 18px; padding: 1px; }
 }
-
-
-
