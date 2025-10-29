@@ -200,19 +200,28 @@ function displayStopTimes(stopTimes) {
         }
 
         // Формат времени с выделением задержки
-        const renderTime = (base, amended) => {
-            if (!base) return "--:--";
-            const baseFmt = formatTimeFromHHMMSS(base);
-            const amendedFmt = formatTimeFromHHMMSS(amended);
-            if (base !== amended) {
-                return `
-                    <span style="color:#c00;text-decoration:line-through;">${baseFmt}</span>
-                    <span style="color:#e8a500;font-weight:bold;margin-left:6px;">${amendedFmt}</span>
-                `;
-            } else {
-                return `<span>${baseFmt}</span>`;
-            }
-        };
+        // Формат времени с выделением задержки
+    const renderTime = (base, amended) => {
+        const cleanBase = (base || "").trim();
+        const cleanAmended = (amended || "").trim();
+
+        if (!cleanBase) return "--:--";
+
+        const baseFmt = formatTimeFromHHMMSS(cleanBase);
+        const amendedFmt = formatTimeFromHHMMSS(cleanAmended);
+
+        // Если amended пустое или совпадает с base → показываем обычное время
+        if (!cleanAmended || cleanBase === cleanAmended) {
+        return `<span>${baseFmt}</span>`;
+    }
+
+    // Если amended отличается → показываем зачёркнутое старое + новое жёлтым
+    return `
+        <span style="color:#c00;text-decoration:line-through;">${baseFmt}</span>
+        <span style="color:#e8a500;font-weight:bold;margin-left:6px;">${amendedFmt}</span>
+    `;
+};
+
 
         const arrivalTime = renderTime(stop.baseArrival, stop.actualArrival);
         const departureTime = renderTime(stop.baseDeparture, stop.actualDeparture);
@@ -284,3 +293,4 @@ function showError(msg) {
 
 // Старт
 fetchVehicleJourneyDetails(vehicleJourneyId);
+
