@@ -8,16 +8,17 @@ const refreshBtn = document.getElementById("refreshBtn");
 let currentStation = null;
 let lastDepartures = [];
 
-// ===== UTILITIES =====
+// ==================== UTILITIES ====================
 function escapeHtml(s = "") {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
+
 function formatTimeFromNavitia(ts) {
   if (!ts || ts.length < 13) return "—";
   return ts.slice(9, 11) + "h" + ts.slice(11, 13);
 }
 
-// ===== SEARCH STATION =====
+// ==================== STATION SEARCH ====================
 async function searchStations(q) {
   if (!q || q.trim().length < 2) return [];
   const url = `https://api.sncf.com/v1/coverage/sncf/places?q=${encodeURIComponent(q)}&type[]=stop_area&count=50`;
@@ -25,13 +26,17 @@ async function searchStations(q) {
     const res = await fetch(url, { headers: { Authorization: "Basic " + btoa(API_KEY + ":") } });
     if (!res.ok) return [];
     const json = await res.json();
-    return (json.places || []).map(p => ({ id: p.id, label: p.stop_area?.label || p.name || p.id }));
-  } catch {
+    return (json.places || []).map(p => ({
+      id: p.id,
+      label: p.stop_area?.label || p.name || p.id
+    }));
+  } catch (e) {
+    console.error(e);
     return [];
   }
 }
 
-// ===== FETCH DEPARTURES =====
+// ==================== FETCH DEPARTURES ====================
 async function fetchDepartures(stopId) {
   if (!stopId) return;
   const now = new Date().toISOString().replace(/[-:]/g, "").split(".")[0];
@@ -52,7 +57,7 @@ async function fetchDepartures(stopId) {
   }
 }
 
-// ===== RENDER BOARD =====
+// ==================== RENDER BOARD ====================
 function renderBoard(departures) {
   const typeFilter = trainTypeSelect.value;
   const isMobile = window.innerWidth < 768;
@@ -92,6 +97,7 @@ function renderBoard(departures) {
 
     const color = info.color ? ("#" + info.color) : "#0052a3";
 
+    // ===== TIME =====
     const baseTs = st.base_departure_date_time;
     const realTs = st.departure_date_time;
     const delayM = Math.floor((st.departure_delay || 0) / 60);
@@ -111,9 +117,14 @@ function renderBoard(departures) {
       originalDisplay = formatTimeFromNavitia(realTs || baseTs);
     }
 
-    // ======== ЛОГИКА ДЕТЕКТА ТИПА ПОЕЗДА ========
+    // ===== TYPE DETECTION =====
     const trainTypeRaw = [
-      info.code, info.label, info.name, info.commercial_mode, info.physical_mode, info.network
+      info.code,
+      info.label,
+      info.name,
+      info.commercial_mode,
+      info.physical_mode,
+      info.network
     ].filter(Boolean).join(" ").toUpperCase();
 
     let logoHtml = "", textHtml = "";
@@ -165,18 +176,18 @@ function renderBoard(departures) {
     `;
   }).join("");
 
-  // === Кликабельные строки ===
-  document.querySelectorAll('.clickable-train-row').forEach(row => {
+  // make rows clickable
+  document.querySelectorAll(".clickable-train-row").forEach(row => {
     const clone = row.cloneNode(true);
     row.parentNode.replaceChild(clone, row);
-    clone.addEventListener('click', function () {
-      const id = this.getAttribute('data-vehicle-journey-id');
+    clone.addEventListener("click", function () {
+      const id = this.getAttribute("data-vehicle-journey-id");
       if (id) window.location.href = `trip?${id}`;
     });
   });
 }
 
-// ===== EVENTS =====
+// ==================== EVENT LISTENERS ====================
 stationInput.addEventListener("input", async (e) => {
   const val = e.target.value;
   if (!val) {
