@@ -56,7 +56,7 @@ async function fetchDepartures(stopId) {
 // Render board with clickable rows
 function renderBoard(departures) {
     const typeFilter = trainTypeSelect.value;
-    
+
     if (!departures.length) {
         boardBody.innerHTML = `<div class="no-data">Aucun départ trouvé</div>`;
         return;
@@ -73,37 +73,36 @@ function renderBoard(departures) {
         return;
     }
 
+    const isMobile = window.innerWidth < 768;
+
     boardBody.innerHTML = filteredDepartures.map((dep, index) => {
         const info = dep.display_informations || {};
         const st = dep.stop_date_time || {};
-        
-        // CORRECTED: Get the vehicle_journey ID from the API
-        let vehicleJourneyId = null;
-        
-        // Method 1: From vehicle_journey object (this is the correct one)
-        if (dep.vehicle_journey && dep.vehicle_journey.id) {
-            vehicleJourneyId = dep.vehicle_journey.id;
-            console.log("Found vehicle_journey ID:", vehicleJourneyId);
-        }
-        // Method 2: From links array as fallback
-        else if (dep.links) {
+
+        // vehicle_journey ID
+        let vehicleJourneyId = dep.vehicle_journey?.id;
+        if (!vehicleJourneyId && dep.links) {
             const vehicleJourneyLink = dep.links.find(link => link.type === "vehicle_journey");
             vehicleJourneyId = vehicleJourneyLink ? vehicleJourneyLink.id : null;
-            console.log("Found vehicle_journey ID from links:", vehicleJourneyId);
         }
 
         const mission = info.headsign || info.code || info.trip_short_name || info.name || info.label || "—";
         const line = info.code || "?";
         const lineDisplay = line === "?" ? (info.commercial_mode || "—") : line;
-        const destination = info.direction || (dep.terminus && dep.terminus.name) || "—";
+
+        // === Очистка названия города (в скобках) для мобильной версии ===
+        let destination = info.direction || (dep.terminus && dep.terminus.name) || "—";
+        if (isMobile && destination.includes("(")) {
+            destination = destination.replace(/\s*\([^)]*\)/g, "").trim();
+        }
+
         const color = info.color ? ("#" + info.color) : "#0052a3";
         const canceled = info.status && info.status.toLowerCase().includes("cancelled");
 
-        // Time calculation
         const baseTs = st.base_departure_date_time || null;
         const realTs = st.departure_date_time || null;
         const delayM = Math.floor((st.departure_delay || 0) / 60);
-        
+
         let delayed = false, originalDisplay = null, newDisplay = null;
         if (baseTs && realTs && baseTs !== realTs) {
             delayed = true;
@@ -121,10 +120,9 @@ function renderBoard(departures) {
             newDisplay = null;
         }
 
-        // Train type and logo
         const commercial = (info.commercial_mode || info.physical_mode || "").toString();
         const trainType = commercial || "Autre";
-        
+
         let logoHtml = "", textHtml = "";
         if (trainType.toUpperCase().includes("TER")) {
             logoHtml = '<img src="logo/ter.svg" class="train-logo" alt="TER">';
@@ -160,8 +158,6 @@ function renderBoard(departures) {
 
         const rowClass = index % 2 === 0 ? "train-row row-light" : "train-row row-dark";
         const clickableClass = vehicleJourneyId ? "clickable-train-row" : "";
-
-        // Add data-vehicle-journey-id only if vehicleJourneyId exists
         const vehicleJourneyIdAttr = vehicleJourneyId ? `data-vehicle-journey-id="${vehicleJourneyId}"` : '';
 
         return `
@@ -175,25 +171,17 @@ function renderBoard(departures) {
         `;
     }).join("");
 
-    // Add click event listeners - SIMPLE AND RELIABLE APPROACH
-    const clickableRows = document.querySelectorAll('.clickable-train-row');
-    clickableRows.forEach(row => {
-        // Remove any existing listeners to avoid duplicates
+    // Add click listeners
+    document.querySelectorAll('.clickable-train-row').forEach(row => {
         const newRow = row.cloneNode(true);
         row.parentNode.replaceChild(newRow, row);
-        
-        // Add new click listener
-        newRow.addEventListener('click', function() {
+        newRow.addEventListener('click', function () {
             const vehicleJourneyId = this.getAttribute('data-vehicle-journey-id');
-            if (vehicleJourneyId) {
-                console.log("Clicked on vehicle_journey:", vehicleJourneyId);
-                // CORRECTED: Use proper encoding and redirect to trip page
-                // Don't use encodeURIComponent here - we want the raw ID in URL
-                window.location.href = `trip?${vehicleJourneyId}`;
-            }
+            if (vehicleJourneyId) window.location.href = `trip?${vehicleJourneyId}`;
         });
     });
 }
+
 
 // Event listeners
 stationInput.addEventListener("input", async (e) => {
