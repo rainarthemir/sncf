@@ -249,5 +249,57 @@ body {
 }
 .row-light { background: #003875; }
 .row-dark { background: #0052a3; }
+/* ===== MOBILE LAYOUT ===== */
+@media (max-width: 767.98px) {
+  body {
+    font-size: 0.9rem;
+  }
+
+  .board {
+    min-width: 100%;
+  }
+
+  .board-header {
+    display: none;
+  }
+
+  .train-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    gap: 0.3rem 0.5rem;
+    padding: 0.8rem 1rem;
+    font-size: 0.85rem;
+  }
+
+  .col-line {
+    grid-column: 1 / 2;
+    font-weight: 900;
+  }
+
+  .col-destination {
+    grid-column: 1 / 3;
+    font-weight: 700;
+    font-size: 0.9rem;
+  }
+
+  .col-time {
+    grid-column: 2 / 3;
+    justify-self: end;
+    font-size: 1rem;
+  }
+
+  .col-type {
+    grid-column: 1 / 3;
+    font-size: 0.8rem;
+    opacity: 0.9;
+  }
+
+  .train-logo {
+    height: 18px;
+    padding: 1px;
+  }
+}
+
 
 
