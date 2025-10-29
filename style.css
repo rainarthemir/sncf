@@ -258,3 +258,40 @@ body {
     border-left: 2px solid #ffd700;
   }
 }
+/* === FIX TRAIN LOGO ALIGNMENT === */
+.col-type {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.4rem;
+  font-weight: 700;
+  text-transform: capitalize;
+  min-width: 140px;
+}
+
+.train-logo {
+  height: 22px;
+  width: auto;
+  background: white;
+  border-radius: 3px;
+  padding: 2px;
+  object-fit: contain;
+  box-shadow: 0 0 2px rgba(0,0,0,0.2);
+}
+
+.train-logo-text {
+  font-size: 0.85rem;
+  color: #fff;
+  white-space: nowrap;
+}
+
+/* Mobile: выравнивание логотипа по центру */
+@media (max-width: 767.98px) {
+  .col-type {
+    justify-content: center;
+  }
+  .train-logo-text {
+    font-size: 0.8rem;
+  }
+}
+
