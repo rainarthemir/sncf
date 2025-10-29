@@ -152,9 +152,11 @@ function renderBoard(departures) {
 
     let logoHtml = "", textHtml = "";
 
-    if (LINE.includes("INTERCIT") || COMM.includes("INTERCIT")) {
-      logoHtml = '<img src="logo/intercites.svg" class="train-logo" alt="Intercités">';
-      textHtml = 'Intercités';
+    if (/^INTERCIT(É|E|ES|ÉS)?\b/.test(LINE) || /^INTERCIT(É|E|ES|ÉS)?\b/.test(COMM)) {
+    logoHtml = '<img src="logo/intercites.svg" class="train-logo" alt="Intercités">';
+    textHtml = 'Intercités';
+  }
+
     } else if (LINE.includes("INOUI") || COMM.includes("INOUI")) {
       logoHtml = '<img src="logo/inoui.svg" class="train-logo" alt="Inoui">';
       textHtml = 'TGV Inoui';
