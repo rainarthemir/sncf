@@ -136,8 +136,8 @@ function renderBoard(departures) {
     } else if (commercial.includes("OUIGO")) {
       logoHtml = '<img src="logo/ouigo.svg" class="train-logo" alt="Ouigo">';
       textHtml = 'Ouigo';
-    } else if (commercial.includes("INTERCIT")) {
-      logoHtml = '<img src="logo/intercite.svg" class="train-logo" alt="Intercités">';
+    } else if (commercial.includes("INTERCITÉS")) {
+      logoHtml = '<img src="logo/intercites.svg" class="train-logo" alt="Intercités">';
       textHtml = 'Intercités';
     } else if (commercial.includes("RER")) {
       logoHtml = '<img src="logo/rer.svg" class="train-logo" alt="RER">';
