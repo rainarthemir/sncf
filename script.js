@@ -78,6 +78,9 @@ async function fetchDepartures(stopId) {
       console.warn("⚠️ Structure inattendue:", json);
     }
 
+    console.log("✅ JSON reçu avec succès:", json);
+    console.log("👉 Départs:", json.departures?.length);
+
     lastDepartures = json.departures || [];
     renderBoard(lastDepartures);
 
