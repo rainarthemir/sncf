@@ -158,7 +158,7 @@ function renderBoard(departures) {
         logoHtml = '<img src="logo/inoui.svg" class="train-logo" alt="TGV Inoui">';
         textHtml = "TGV Inoui";
       }
-      else if (commercialMode === "OUIGO" || commercialMode === "OUIGO TRAIN CLASSIQUE") {
+      else if (commercialMode === "OUIGO" || commercialMode === "OUIGO Train Classique") {
         logoHtml = '<img src="logo/ouigo.svg" class="train-logo" alt="OUIGO">';
         textHtml = "OUIGO";
       }
