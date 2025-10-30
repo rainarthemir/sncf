@@ -151,47 +151,59 @@ function renderBoard(departures) {
       let logoHtml = "";
       let textHtml = "";
       
-      const fields = [info.commercial_mode, info.physical_mode, info.network, info.code, info.name, info.label, lineDisplay]
+      const commercialMode = norm(info.commercial_mode || "");
+      const physicalMode = norm(info.physical_mode || "");
+      const network = norm(info.network || "");
+      
+      const fields = [commercialMode, physicalMode, network, info.code, info.name, info.label, lineDisplay]
         .filter(Boolean)
         .map(norm);
 
       const combined = fields.join(" ");
 
-      // Улучшенная логика определения типа поезда
-      // Сначала проверяем более специфичные типы
-      
-      // TGV INOUI
-      if (/\bTGV\s*INOUI\b/.test(combined)) {
-        logoHtml = '<img src="logo/tgv-inoui.svg" class="train-logo" alt="TGV INOUI">';
-        textHtml = "TGV INOUI";
-      }
-      // OUIGO
-      else if (/\bOUIGO\b/.test(combined)) {
-        logoHtml = '<img src="logo/ouigo.svg" class="train-logo" alt="OUIGO">';
-        textHtml = "OUIGO";
-      }
-      // TGV
-      else if (/\bTGV\b/.test(combined)) {
+      // Улучшенная логика с точным определением по commercial_mode
+      if (commercialMode === "TGV" || commercialMode === "TGV INOUI") {
         logoHtml = '<img src="logo/tgv.svg" class="train-logo" alt="TGV">';
         textHtml = "TGV";
       }
-      // Intercités (должен быть перед TER, так как некоторые Intercités могут содержать "TER" в названии)
-      else if (/\bINTERCITES?\b/.test(combined) || /\bINTERCITE\b/.test(combined)) {
+      else if (commercialMode === "OUIGO") {
+        logoHtml = '<img src="logo/ouigo.svg" class="train-logo" alt="OUIGO">';
+        textHtml = "OUIGO";
+      }
+      else if (commercialMode === "INTERCITÉS" || commercialMode === "INTERCITES") {
         logoHtml = '<img src="logo/intercites.svg" class="train-logo" alt="Intercités">';
         textHtml = "Intercités";
       }
-      // TER
-      else if (/\bTER\b/.test(combined)) {
+      else if (commercialMode === "TER") {
         logoHtml = '<img src="logo/ter.svg" class="train-logo" alt="TER">';
         textHtml = "TER";
       }
-      // RER
+      else if (commercialMode === "RER") {
+        logoHtml = '<img src="logo/rer.svg" class="train-logo" alt="RER">';
+        textHtml = "RER";
+      }
+      else if (commercialMode === "TRANSILIEN") {
+        logoHtml = '<img src="logo/transilien.svg" class="train-logo" alt="Transilien">';
+        textHtml = "Transilien";
+      }
+      // Резервная проверка по физическому режиму и другим полям
+      else if (physicalMode === "TRAIN À GRANDE VITESSE" || /\bTGV\b/.test(combined)) {
+        logoHtml = '<img src="logo/tgv.svg" class="train-logo" alt="TGV">';
+        textHtml = "TGV";
+      }
+      else if (physicalMode === "TRAIN INTERCITÉS" || /\bINTERCITÉS\b/.test(combined) || /\bINTERCITES\b/.test(combined)) {
+        logoHtml = '<img src="logo/intercites.svg" class="train-logo" alt="Intercités">';
+        textHtml = "Intercités";
+      }
+      else if (physicalMode === "TRAIN EXPRESS RÉGIONAL" || /\bTER\b/.test(combined)) {
+        logoHtml = '<img src="logo/ter.svg" class="train-logo" alt="TER">';
+        textHtml = "TER";
+      }
       else if (/\bRER\b/.test(combined)) {
         logoHtml = '<img src="logo/rer.svg" class="train-logo" alt="RER">';
         textHtml = "RER";
       }
-      // Transilien
-      else if (/TRANSILIEN|TRANS/.test(combined)) {
+      else if (/\bTRANSILIEN\b/.test(combined) || /\bTRANS\b/.test(combined)) {
         logoHtml = '<img src="logo/transilien.svg" class="train-logo" alt="Transilien">';
         textHtml = "Transilien";
       }
