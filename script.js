@@ -150,22 +150,20 @@ function renderBoard(departures) {
     function getTrainLogo(info, lineDisplay = "") {
       let logoHtml = "";
       let textHtml = "";
-      const words = combined.split(" ");
+      
       const fields = [info.commercial_mode, info.physical_mode, info.network, info.code, info.name, info.label, lineDisplay]
         .filter(Boolean)
         .map(norm);
 
       const combined = fields.join(" ");
 
-      // Ищем Intercités как отдельное слово или как часть "Intercités de Nuit"
-      if (/\bINTERCITE\b/.test(combined)) {
-        logoHtml = '<img src="logo/intercites.svg" class="train-logo" alt="Intercités">';
-        textHtml = "Intercités";
-      }
-      // TER (любое отдельное слово TER)
-      else if (/\bTER\b/.test(combined)) {
-        logoHtml = '<img src="logo/ter.svg" class="train-logo" alt="TER">';
-        textHtml = "TER";
+      // Улучшенная логика определения типа поезда
+      // Сначала проверяем более специфичные типы
+      
+      // TGV INOUI
+      if (/\bTGV\s*INOUI\b/.test(combined)) {
+        logoHtml = '<img src="logo/tgv-inoui.svg" class="train-logo" alt="TGV INOUI">';
+        textHtml = "TGV INOUI";
       }
       // OUIGO
       else if (/\bOUIGO\b/.test(combined)) {
@@ -176,6 +174,16 @@ function renderBoard(departures) {
       else if (/\bTGV\b/.test(combined)) {
         logoHtml = '<img src="logo/tgv.svg" class="train-logo" alt="TGV">';
         textHtml = "TGV";
+      }
+      // Intercités (должен быть перед TER, так как некоторые Intercités могут содержать "TER" в названии)
+      else if (/\bINTERCITES?\b/.test(combined) || /\bINTERCITE\b/.test(combined)) {
+        logoHtml = '<img src="logo/intercites.svg" class="train-logo" alt="Intercités">';
+        textHtml = "Intercités";
+      }
+      // TER
+      else if (/\bTER\b/.test(combined)) {
+        logoHtml = '<img src="logo/ter.svg" class="train-logo" alt="TER">';
+        textHtml = "TER";
       }
       // RER
       else if (/\bRER\b/.test(combined)) {
