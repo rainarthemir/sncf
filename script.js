@@ -155,14 +155,14 @@ function renderBoard(departures) {
 
       // ТОЛЬКО commercial_mode - больше никаких других полей!
       if (commercialMode === "TGV" || commercialMode === "TGV INOUI") {
-        logoHtml = '<img src="logo/tgv.svg" class="train-logo" alt="TGV">';
-        textHtml = "TGV";
+        logoHtml = '<img src="logo/inoui.svg" class="train-logo" alt="TGV Inoui">';
+        textHtml = "TGV Inoui";
       }
-      else if (commercialMode === "OUIGO") {
+      else if (commercialMode === "OUIGO" || commercialMode === "OUIGO TRAIN CLASSIQUE") {
         logoHtml = '<img src="logo/ouigo.svg" class="train-logo" alt="OUIGO">';
         textHtml = "OUIGO";
       }
-      else if (commercialMode === "INTERCITÉS" || commercialMode === "INTERCITES") {
+      else if (commercialMode === "INTERCITÉS" || commercialMode === "INTERCITES" || commercialMode === "INTERCITÉS DE NUIT") {
         logoHtml = '<img src="logo/intercites.svg" class="train-logo" alt="Intercités">';
         textHtml = "Intercités";
       }
@@ -177,6 +177,10 @@ function renderBoard(departures) {
       else if (commercialMode === "TRANSILIEN") {
         logoHtml = '<img src="logo/transilien.svg" class="train-logo" alt="Transilien">';
         textHtml = "Transilien";
+      }
+      else if (commercialMode === "EUROSTAR") {
+        logoHtml = '<img src="logo/eurostar.svg" class="train-logo" alt="Eurostar">';
+        textHtml = "Eurostar";
       }
       // По умолчанию - показываем commercial_mode как есть
       else {
