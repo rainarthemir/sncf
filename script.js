@@ -19,6 +19,16 @@ function escapeHtml(s = "") {
   }[c]));
 }
 
+// Нормализация текста: убирает акценты, лишние пробелы и приводит к верхнему регистру
+function norm(str) {
+  return str
+    ?.normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase() || "";
+}
+
 function formatTimeFromNavitia(ts) {
   if (!ts || ts.length < 13) return "—";
   return ts.slice(9, 11) + "h" + ts.slice(11, 13);
@@ -136,77 +146,53 @@ function renderBoard(departures) {
       originalDisplay = formatTimeFromNavitia(realTs || baseTs);
     }
 
-    // === LOGO DETECTION ===
-    // 🔧 Универсальная нормализация текста (убирает акценты, пробелы, регистр)
-  function norm(str) {
-    return str
-      ?.normalize("NFD")                // разбивает символы с диакритиками (é → e + ́)
-      .replace(/[\u0300-\u036f]/g, "")  // удаляет все акценты
-      .replace(/\s+/g, " ")             // схлопывает лишние пробелы
-      .trim()                           // убирает пробелы по краям
-      .toUpperCase()                    // приводит к верхнему регистру
-      || "";
-  }
+    // ===================== ЛОГОТИПЫ =====================
+    function getTrainLogo(info, lineDisplay = "") {
+      let logoHtml = "";
+      let textHtml = "";
 
-  // 🎨 Логика выбора логотипа по типу поезда
-  function getTrainLogo(info, lineDisplay = "") {
-    let logoHtml = "";
-    let textHtml = "";
+      const fields = [info.commercial_mode, info.physical_mode, info.network, info.code, info.name, info.label, lineDisplay];
+      const combined = fields.filter(Boolean).map(norm).join(" ");
 
-    // Собираем все возможные поля и нормализуем
-    const COMM = norm([info.commercial_mode, info.physical_mode, info.network].filter(Boolean).join(" "));
-    const LINE = norm([lineDisplay, info.code, info.label, info.name].filter(Boolean).join(" "));
+      // 🚄 TGV
+      if (combined.includes("TGV")) {
+        logoHtml = '<img src="logo/tgv.svg" class="train-logo" alt="TGV">';
+        textHtml = "TGV";
+      }
+      // 🚅 OUIGO
+      else if (combined.includes("OUIGO")) {
+        logoHtml = '<img src="logo/ouigo.svg" class="train-logo" alt="OUIGO">';
+        textHtml = "OUIGO";
+      }
+      // 🚆 TER
+      else if (combined.includes("TER")) {
+        logoHtml = '<img src="logo/ter.svg" class="train-logo" alt="TER">';
+        textHtml = "TER";
+      }
+      // 🚋 Transilien
+      else if (combined.includes("TRANSILIEN") || combined.includes("TRANS")) {
+        logoHtml = '<img src="logo/transilien.svg" class="train-logo" alt="Transilien">';
+        textHtml = "Transilien";
+      }
+      // 🚈 RER
+      else if (combined.includes("RER")) {
+        logoHtml = '<img src="logo/rer.svg" class="train-logo" alt="RER">';
+        textHtml = "RER";
+      }
+      // 🚄 Intercités
+      else if (combined.includes("INTERCITE")) {
+        logoHtml = '<img src="logo/intercites.svg" class="train-logo" alt="Intercités">';
+        textHtml = "Intercités";
+      }
+      // По умолчанию
+      else {
+        textHtml = info.commercial_mode || lineDisplay || "Autre";
+      }
 
-    // 🚄 TGV
-    if (LINE.includes("TGV") || COMM.includes("TGV")) {
-      logoHtml = '<img src="logo/tgv.svg" class="train-logo" alt="TGV">';
-      textHtml = "TGV";
+      return { logoHtml, textHtml };
     }
 
-    // 🚅 OUIGO
-    else if (LINE.includes("OUIGO") || COMM.includes("OUIGO")) {
-      logoHtml = '<img src="logo/ouigo.svg" class="train-logo" alt="OUIGO">';
-      textHtml = "OUIGO";
-    }
-
-    // 🚆 TER
-    else if (LINE.includes("TER") || COMM.includes("TER")) {
-      logoHtml = '<img src="logo/ter.svg" class="train-logo" alt="TER">';
-      textHtml = "TER";
-    }
-
-    // 🚋 Transilien
-    else if (LINE.includes("TRANSILIEN") || COMM.includes("TRANSILIEN")) {
-      logoHtml = '<img src="logo/transilien.svg" class="train-logo" alt="Transilien">';
-      textHtml = "Transilien";
-    }
-
-    // 🚈 RER
-    else if (LINE.includes("RER") || COMM.includes("RER")) {
-      logoHtml = '<img src="logo/rer.svg" class="train-logo" alt="RER">';
-      textHtml = "RER";
-    }
-
-    // 🚄 Intercités — исправлено!
-    else if (/(^|\s)INTERCITE(S|\b)/.test(LINE) || /(^|\s)INTERCITE(S|\b)/.test(COMM)) {
-      logoHtml = '<img src="logo/intercites.svg" class="train-logo" alt="Intercités">';
-      textHtml = "Intercités";
-    }
-
-    // 🚉 Default fallback — если неизвестный тип
-    else {
-      textHtml = info.commercial_mode || info.physical_mode || lineDisplay || "Train";
-    }
-
-    // 📦 Возвращаем готовый HTML
-    return `
-      <div class="train-logo-text">
-        ${logoHtml ? logoHtml + " " : ""}${textHtml}
-      </div>
-    `;
-  }
-
-
+    const { logoHtml, textHtml } = getTrainLogo(info, lineDisplay);
 
     const timeCell = canceled
       ? `<span class="canceled-time">${originalDisplay || "—"}</span>`
@@ -229,6 +215,7 @@ function renderBoard(departures) {
     `;
   }).join("");
 
+  // Добавляем кликабельность для поездов
   document.querySelectorAll('.clickable-train-row').forEach(row => {
     const clone = row.cloneNode(true);
     row.parentNode.replaceChild(clone, row);
@@ -238,7 +225,6 @@ function renderBoard(departures) {
     });
   });
 }
-
 
 // ===================== EVENTS =====================
 stationInput.addEventListener("input", async e => {
