@@ -162,7 +162,7 @@ function renderBoard(departures) {
         logoHtml = '<img src="logo/ouigo.svg" class="train-logo" alt="OUIGO">';
         textHtml = "OUIGO";
       }
-      else if (commercialMode === "INTERCITÉS" || commercialMode === "INTERCITES" || commercialMode === "INTERCITÉS DE NUIT") {
+      else if (commercialMode === "INTERCITÉS" || commercialMode === "INTERCITES" || commercialMode === "Intercités de Nuit" || || commercialMode === "Intercites de Nuit") {
         logoHtml = '<img src="logo/intercites.svg" class="train-logo" alt="Intercités">';
         textHtml = "Intercités";
       }
