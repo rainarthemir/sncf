@@ -1,6 +1,6 @@
 @font-face {
   font-family: 'Parisine Std';
-  src: url('./Parisine Regular.woff') format('opentype');
+  src: url('./Parisine-Regular.woff') format('opentype');
   font-weight: 400;
   font-style: normal;
 }
@@ -285,13 +285,13 @@ body {
   white-space: nowrap;
 }
 
-/* Mobile: выравнивание логотипа по центру */
+/* Mobile: выравнивание логотипа справа */
 @media (max-width: 767.98px) {
   .col-type {
-    justify-content: center;
+    justify-content: flex-end;
+    text-align: right;
   }
   .train-logo-text {
     font-size: 0.8rem;
   }
 }
-
