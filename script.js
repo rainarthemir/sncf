@@ -158,25 +158,13 @@ function renderBoard(departures) {
         logoHtml = '<img src="logo/inoui.svg" class="train-logo" alt="TGV Inoui">';
         textHtml = "TGV Inoui";
       }
-      else if (commercialMode === "OUIGO" || commercialMode === "OUIGO Train Classique") {
+      else if (commercialMode === "OUIGO" || commercialMode === "OUIGO TRAIN CLASSIQUE") {
         logoHtml = '<img src="logo/ouigo.svg" class="train-logo" alt="OUIGO">';
         textHtml = "OUIGO";
       }
-      else if (commercialMode === "INTERCITÉS" || commercialMode === "INTERCITES" || commercialMode === "INTERCITÉS DE NUIT" || commercialMode === "INTERCITES DE NUIT") {
+      else if (commercialMode === "INTERCITES" || commercialMode === "INTERCITES DE NUIT") {
         logoHtml = '<img src="logo/intercites.svg" class="train-logo" alt="Intercités">';
         textHtml = "Intercités";
-      }
-      else if (commercialMode === "TER") {
-        logoHtml = '<img src="logo/ter.svg" class="train-logo" alt="TER">';
-        textHtml = "TER";
-      }
-      else if (commercialMode === "RER") {
-        logoHtml = '<img src="logo/rer.svg" class="train-logo" alt="RER">';
-        textHtml = "RER";
-      }
-      else if (commercialMode === "TRANSILIEN") {
-        logoHtml = '<img src="logo/transilien.svg" class="train-logo" alt="Transilien">';
-        textHtml = "Transilien";
       }
       else if (commercialMode === "EUROSTAR") {
         logoHtml = '<img src="logo/eurostar.svg" class="train-logo" alt="Eurostar">';
@@ -186,7 +174,7 @@ function renderBoard(departures) {
         logoHtml = '<img src="logo/dbsncf.svg" class="train-logo" alt="DB SNCF">';
         textHtml = "DB & SNCF";
       }
-      else if (commercialMode === "BreizhGo") {
+      else if (commercialMode === "BREIZHGO") {
         logoHtml = '<img src="logo/bretagne.svg" class="train-logo" alt="BreizhGo">';
         textHtml = "TER";
       }
@@ -198,15 +186,15 @@ function renderBoard(departures) {
         logoHtml = '<img src="logo/ara.svg" class="train-logo" alt="TER AuRA">';
         textHtml = "TER";
       }
-      else if (commercialMode === "Aléop" || commercialMode === "Aleop" ) {
+      else if (commercialMode === "ALEOP") {
         logoHtml = '<img src="logo/aleop.svg" class="train-logo" alt="ALÉOP">';
         textHtml = "TER";
       }
-      else if (commercialMode === "LiO") {
+      else if (commercialMode === "LIO") {
         logoHtml = '<img src="logo/lio.svg" class="train-logo" alt="LiO">';
         textHtml = "TER";
       }
-      else if (commercialMode === "Rémi" || commercialMode === "Remi" || commercialMode === "Rémi Exp" || commercialMode === "Remi Exp") {
+      else if (commercialMode === "REMI" || commercialMode === "REMI EXP") {
         logoHtml = '<img src="logo/remi.svg" class="train-logo" alt="Remi">';
         textHtml = "TER";
       }
@@ -230,10 +218,23 @@ function renderBoard(departures) {
         logoHtml = '<img src="logo/na.svg" class="train-logo" alt="Nouvelle Aquitaine">';
         textHtml = "TER";
       }
-        
+      else if (commercialMode === "TER") {
+        logoHtml = '<img src="logo/ter.svg" class="train-logo" alt="TER">';
+        textHtml = "TER";
+      }
+      else if (commercialMode === "RER") {
+        logoHtml = '<img src="logo/rer.svg" class="train-logo" alt="RER">';
+        textHtml = "RER";
+      }
+      else if (commercialMode === "TRANSILIEN") {
+        logoHtml = '<img src="logo/transilien.svg" class="train-logo" alt="Transilien">';
+        textHtml = "Transilien";
+      }
       // По умолчанию - показываем commercial_mode как есть
       else {
         textHtml = info.commercial_mode || "Autre";
+        // Для отладки можно раскомментировать следующую строку:
+        // console.log("Unknown commercial_mode:", info.commercial_mode, "normalized:", commercialMode);
       }
       return { logoHtml, textHtml };
     }
