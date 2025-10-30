@@ -141,10 +141,10 @@ function renderBoard(departures) {
     return s
       .normalize('NFD')
       .replace(/\p{Diacritic}/gu, '')
-      .toUpperCase()
       .replace(/\s+/g, ' ')
       .trim();
   }
+
 
   const COMM = norm([info.commercial_mode, info.physical_mode, info.network].filter(Boolean).join(' '));
   const LINE = norm([lineDisplay, info.code, info.label, info.name].filter(Boolean).join(' '));
@@ -153,7 +153,7 @@ function renderBoard(departures) {
   let logoHtml = "", textHtml = "";
 
   // Intercités (только точные совпадения)
-  if (["Intercités", "Intercités de nuit"].includes(LINE) || ["ntercités", "Intercités de nuit"].includes(COMM)) {
+  if (["Intercités", "Intercités de nuit"].includes(LINE) || ["Intercités", "Intercités de nuit"].includes(COMM)) {
     logoHtml = '<img src="logo/intercites.svg" class="train-logo" alt="Intercités">';
     textHtml = 'Intercités';
 
@@ -165,7 +165,7 @@ function renderBoard(departures) {
   // OUIGO (включая Classique)
   } else if (LINE.includes("OUIGO") || COMM.includes("OUIGO") || LINE.includes("CLASSIQUE")) {
     logoHtml = '<img src="logo/ouigo.svg" class="train-logo" alt="Ouigo">';
-    textHtml = 'TGV Ouigo';
+    textHtml = 'OUIGO';
 
   // Eurostar
   } else if (LINE.includes("EUROSTAR") || COMM.includes("EUROSTAR")) {
