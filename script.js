@@ -150,7 +150,7 @@ function renderBoard(departures) {
     function getTrainLogo(info, lineDisplay = "") {
       let logoHtml = "";
       let textHtml = "";
-
+      const words = combined.split(" ");
       const fields = [info.commercial_mode, info.physical_mode, info.network, info.code, info.name, info.label, lineDisplay];
       const combined = fields.filter(Boolean).map(norm).join(" ");
 
@@ -165,7 +165,7 @@ function renderBoard(departures) {
         textHtml = "OUIGO";
       }
       // 🚆 TER
-      else if (combined.includes("TER")) {
+      else if (words.includes("TER")) {
         logoHtml = '<img src="logo/ter.svg" class="train-logo" alt="TER">';
         textHtml = "TER";
       }
@@ -180,7 +180,7 @@ function renderBoard(departures) {
         textHtml = "RER";
       }
       // 🚄 Intercités
-      else if (combined.includes("INTERCITE")) {
+      else if (words.includes("INTERCITES")) {
         logoHtml = '<img src="logo/intercites.svg" class="train-logo" alt="Intercités">';
         textHtml = "Intercités";
       }
