@@ -226,7 +226,10 @@ function renderBoard(departures) {
         logoHtml = '<img src="logo/terhdf.svg" class="train-logo" alt="HDF">';
         textHtml = "TER";
       }
-        
+      else if (commercialMode === "TER NA") {
+        logoHtml = '<img src="logo/na.svg" class="train-logo" alt="Nouvelle Aquitaine">';
+        textHtml = "TER";
+      }
         
       // По умолчанию - показываем commercial_mode как есть
       else {
