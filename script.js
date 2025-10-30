@@ -147,21 +147,13 @@ function renderBoard(departures) {
     }
 
     // ===================== ЛОГОТИПЫ =====================
-    function getTrainLogo(info, lineDisplay = "") {
+    function getTrainLogo(info) {
       let logoHtml = "";
       let textHtml = "";
       
       const commercialMode = norm(info.commercial_mode || "");
-      const physicalMode = norm(info.physical_mode || "");
-      const network = norm(info.network || "");
-      
-      const fields = [commercialMode, physicalMode, network, info.code, info.name, info.label, lineDisplay]
-        .filter(Boolean)
-        .map(norm);
 
-      const combined = fields.join(" ");
-
-      // Улучшенная логика с точным определением по commercial_mode
+      // ТОЛЬКО commercial_mode - больше никаких других полей!
       if (commercialMode === "TGV" || commercialMode === "TGV INOUI") {
         logoHtml = '<img src="logo/tgv.svg" class="train-logo" alt="TGV">';
         textHtml = "TGV";
@@ -186,35 +178,14 @@ function renderBoard(departures) {
         logoHtml = '<img src="logo/transilien.svg" class="train-logo" alt="Transilien">';
         textHtml = "Transilien";
       }
-      // Резервная проверка по физическому режиму и другим полям
-      else if (physicalMode === "TRAIN À GRANDE VITESSE" || /\bTGV\b/.test(combined)) {
-        logoHtml = '<img src="logo/tgv.svg" class="train-logo" alt="TGV">';
-        textHtml = "TGV";
-      }
-      else if (physicalMode === "TRAIN INTERCITÉS" || /\bINTERCITÉS\b/.test(combined) || /\bINTERCITES\b/.test(combined)) {
-        logoHtml = '<img src="logo/intercites.svg" class="train-logo" alt="Intercités">';
-        textHtml = "Intercités";
-      }
-      else if (physicalMode === "TRAIN EXPRESS RÉGIONAL" || /\bTER\b/.test(combined)) {
-        logoHtml = '<img src="logo/ter.svg" class="train-logo" alt="TER">';
-        textHtml = "TER";
-      }
-      else if (/\bRER\b/.test(combined)) {
-        logoHtml = '<img src="logo/rer.svg" class="train-logo" alt="RER">';
-        textHtml = "RER";
-      }
-      else if (/\bTRANSILIEN\b/.test(combined) || /\bTRANS\b/.test(combined)) {
-        logoHtml = '<img src="logo/transilien.svg" class="train-logo" alt="Transilien">';
-        textHtml = "Transilien";
-      }
-      // По умолчанию
+      // По умолчанию - показываем commercial_mode как есть
       else {
-        textHtml = info.commercial_mode || lineDisplay || "Autre";
+        textHtml = info.commercial_mode || "Autre";
       }
       return { logoHtml, textHtml };
     }
 
-    const { logoHtml, textHtml } = getTrainLogo(info, lineDisplay);
+    const { logoHtml, textHtml } = getTrainLogo(info);
 
     const timeCell = canceled
       ? `<span class="canceled-time">${originalDisplay || "—"}</span>`
