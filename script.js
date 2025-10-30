@@ -151,44 +151,46 @@ function renderBoard(departures) {
       let logoHtml = "";
       let textHtml = "";
       const words = combined.split(" ");
-      const fields = [info.commercial_mode, info.physical_mode, info.network, info.code, info.name, info.label, lineDisplay];
-      const combined = fields.filter(Boolean).map(norm).join(" ");
+      const fields = [info.commercial_mode, info.physical_mode, info.network, info.code, info.name, info.label, lineDisplay]
+        .filter(Boolean)
+        .map(norm);
 
-      // 🚄 TGV
-      if (combined.includes("TGV")) {
-        logoHtml = '<img src="logo/tgv.svg" class="train-logo" alt="TGV">';
-        textHtml = "TGV";
+      const combined = fields.join(" ");
+
+      // Ищем Intercités как отдельное слово или как часть "Intercités de Nuit"
+      if (/\bINTERCITE\b/.test(combined)) {
+        logoHtml = '<img src="logo/intercites.svg" class="train-logo" alt="Intercités">';
+        textHtml = "Intercités";
       }
-      // 🚅 OUIGO
-      else if (combined.includes("OUIGO")) {
-        logoHtml = '<img src="logo/ouigo.svg" class="train-logo" alt="OUIGO">';
-        textHtml = "OUIGO";
-      }
-      // 🚆 TER
-      else if (words.includes("TER")) {
+      // TER (любое отдельное слово TER)
+      else if (/\bTER\b/.test(combined)) {
         logoHtml = '<img src="logo/ter.svg" class="train-logo" alt="TER">';
         textHtml = "TER";
       }
-      // 🚋 Transilien
-      else if (combined.includes("TRANSILIEN") || combined.includes("TRANS")) {
-        logoHtml = '<img src="logo/transilien.svg" class="train-logo" alt="Transilien">';
-        textHtml = "Transilien";
+      // OUIGO
+      else if (/\bOUIGO\b/.test(combined)) {
+        logoHtml = '<img src="logo/ouigo.svg" class="train-logo" alt="OUIGO">';
+        textHtml = "OUIGO";
       }
-      // 🚈 RER
-      else if (combined.includes("RER")) {
+      // TGV
+      else if (/\bTGV\b/.test(combined)) {
+        logoHtml = '<img src="logo/tgv.svg" class="train-logo" alt="TGV">';
+        textHtml = "TGV";
+      }
+      // RER
+      else if (/\bRER\b/.test(combined)) {
         logoHtml = '<img src="logo/rer.svg" class="train-logo" alt="RER">';
         textHtml = "RER";
       }
-      // 🚄 Intercités
-      else if (words.includes("INTERCITES")) {
-        logoHtml = '<img src="logo/intercites.svg" class="train-logo" alt="Intercités">';
-        textHtml = "Intercités";
+      // Transilien
+      else if (/TRANSILIEN|TRANS/.test(combined)) {
+        logoHtml = '<img src="logo/transilien.svg" class="train-logo" alt="Transilien">';
+        textHtml = "Transilien";
       }
       // По умолчанию
       else {
         textHtml = info.commercial_mode || lineDisplay || "Autre";
       }
-
       return { logoHtml, textHtml };
     }
 
