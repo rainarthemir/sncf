@@ -31,6 +31,8 @@ function norm(str) {
 
 function formatTimeFromNavitia(ts) {
   if (!ts || ts.length < 16) return "—";
+  // Формат: "20251110T183100" -> "18h31"
+  // Индексы: 0123456789012345
   return ts.slice(9, 11) + "h" + ts.slice(11, 13);
 }
 
