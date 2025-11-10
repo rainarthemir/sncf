@@ -47,7 +47,7 @@
             font-size: 42px;
             font-weight: bold;
             background: #ffcc00;
-            color: white; /* Изменено на белый */
+            color: white;
             padding: 15px 30px;
             border-radius: 8px;
             min-width: 120px;
@@ -67,6 +67,9 @@
             font-weight: bold;
             color: white;
             padding: 0 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
         .current-time {
@@ -85,6 +88,7 @@
             display: flex;
             flex-direction: column;
             position: relative;
+            transition: transform 0.5s ease;
         }
         
         .timeline {
@@ -92,19 +96,20 @@
             left: 40px;
             top: 0;
             bottom: 0;
-            width: 4px;
+            width: 6px; /* Увеличили толщину линии */
             background-color: #cccccc;
             z-index: 1;
         }
         
         .stop-item {
-            padding: 30px 40px 30px 80px;
+            padding: 30px 40px 30px 90px; /* Увеличили отступ слева для больших точек */
             border-bottom: 2px solid #e0e0e0;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-shrink: 0;
             position: relative;
+            transition: all 0.5s ease;
         }
         
         .stop-item:last-child {
@@ -113,20 +118,22 @@
         
         .stop-dot {
             position: absolute;
-            left: 34px;
+            left: 35px; /* Подвинули для более толстой линии */
             top: 50%;
             transform: translateY(-50%);
-            width: 16px;
-            height: 16px;
+            width: 22px; /* Увеличили размер точек */
+            height: 22px;
             border-radius: 50%;
             background-color: #cccccc;
             z-index: 2;
+            border: 3px solid white; /* Добавили белую обводку */
+            box-shadow: 0 0 0 1px #e0e0e0; /* Добавили тень для контраста */
         }
         
         .stop-dot.active {
-            width: 20px;
-            height: 20px;
-            left: 32px;
+            width: 26px;
+            height: 26px;
+            left: 33px;
             box-shadow: 0 0 0 4px rgba(255, 204, 0, 0.3);
         }
         
@@ -169,6 +176,9 @@
             background: #f5f5f5;
             flex-shrink: 0;
             position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
         .more-stops-indicator::before {
@@ -177,8 +187,21 @@
             left: 40px;
             top: 0;
             bottom: 0;
-            width: 4px;
+            width: 6px; /* Увеличили толщину линии */
             background-color: #cccccc;
+        }
+        
+        .more-stops-arrow {
+            position: absolute;
+            left: 37px; /* Расположили стрелку на линии */
+            top: 50%;
+            transform: translateY(-50%);
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 3;
         }
         
         .no-more-stops {
@@ -209,6 +232,16 @@
             color: #666;
             font-size: 18px;
             flex-shrink: 0;
+        }
+        
+        /* Анимация движения табло */
+        @keyframes slideUp {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-100px); }
+        }
+        
+        .sliding-up {
+            animation: slideUp 0.8s ease forwards;
         }
         
         /* Стили для скроллбара */
@@ -248,7 +281,9 @@
             <!-- Остановки будут добавляться сюда динамически -->
         </div>
         
-        <div class="more-stops-indicator" id="more-indicator" style="display: none;">▼</div>
+        <div class="more-stops-indicator" id="more-indicator" style="display: none;">
+            <div class="more-stops-arrow">▼</div>
+        </div>
         <div class="no-more-stops" id="no-more-indicator"></div>
         
         <div class="footer">
@@ -258,6 +293,8 @@
 
     <script>
         const API_KEY = "e41a2be9-7450-4f1a-a7e6-eb429950186f";
+        let currentNextStopIndex = -1;
+        let currentLineColor = "#cccccc";
         
         // Mettre à jour l'heure en temps réel
         function updateTime() {
@@ -467,9 +504,9 @@
                 document.getElementById('line-name').textContent = lineName;
                 document.getElementById('line-name').style.backgroundColor = lineColor;
                 
-                // Numéro du train
+                // Numéro du train (без слова "Train")
                 const trainNumber = vehicleJourney.name || vehicleJourney.id?.split(':').pop() || "N/A";
-                document.getElementById('train-number').textContent = `Train ${trainNumber}`;
+                document.getElementById('train-number').textContent = trainNumber; // Убрали "Train "
                 
                 // Destination (dernier arrêt non sauté)
                 let destination = "Destination inconnue";
@@ -501,15 +538,18 @@
             const noMoreIndicator = document.getElementById('no-more-indicator');
             const timeline = document.getElementById('timeline');
             
+            // Сохраняем цвет линии для использования в анимации
+            currentLineColor = lineColor || '#cccccc';
+            
             // Обновляем цвет линии маршрута
             if (timeline) {
-                timeline.style.backgroundColor = lineColor || '#cccccc';
+                timeline.style.backgroundColor = currentLineColor;
             }
             
             // Обновляем цвет линии в индикаторе
-            const moreIndicatorLine = moreIndicator.querySelector('::before');
-            if (moreIndicatorLine) {
-                moreIndicatorLine.style.backgroundColor = lineColor || '#cccccc';
+            const moreIndicatorBefore = document.querySelector('.more-stops-indicator::before');
+            if (moreIndicatorBefore) {
+                moreIndicatorBefore.style.backgroundColor = currentLineColor;
             }
             
             // Effacer le contenu précédent sauf loading/error и timeline
@@ -517,9 +557,8 @@
             const error = document.getElementById('error');
             
             // Удаляем все дочерние элементы кроме timeline, loading и error
-            const children = stopsContainer.children;
-            for (let i = children.length - 1; i >= 0; i--) {
-                const child = children[i];
+            const children = Array.from(stopsContainer.children);
+            for (const child of children) {
                 if (child.id !== 'timeline' && child.id !== 'loading' && child.id !== 'error') {
                     stopsContainer.removeChild(child);
                 }
@@ -541,6 +580,17 @@
             // Trouver l'index du prochain arrêt
             const nextStopIndex = findNextStopIndex(stopTimes);
             
+            // Проверяем, изменился ли индекс следующей остановки для анимации
+            if (currentNextStopIndex !== -1 && currentNextStopIndex !== nextStopIndex) {
+                // Добавляем анимацию сдвига
+                stopsContainer.classList.add('sliding-up');
+                setTimeout(() => {
+                    stopsContainer.classList.remove('sliding-up');
+                }, 800);
+            }
+            
+            currentNextStopIndex = nextStopIndex;
+            
             // Afficher jusqu'à 4 arrêts à partir du prochain
             const stopsToShow = stopTimes.slice(nextStopIndex, nextStopIndex + 4);
             
@@ -556,7 +606,7 @@
                 if (index === 0) {
                     stopDot.classList.add('active');
                 }
-                stopDot.style.backgroundColor = lineColor || '#cccccc';
+                stopDot.style.backgroundColor = currentLineColor;
                 stopItem.appendChild(stopDot);
                 
                 const stopName = document.createElement('div');
@@ -599,6 +649,12 @@
             if (remainingStops > 0) {
                 moreIndicator.style.display = 'block';
                 noMoreIndicator.style.display = 'none';
+                
+                // Обновляем цвет стрелки
+                const arrow = moreIndicator.querySelector('.more-stops-arrow');
+                if (arrow) {
+                    arrow.style.color = currentLineColor;
+                }
             } else {
                 moreIndicator.style.display = 'none';
                 noMoreIndicator.style.display = 'block';
