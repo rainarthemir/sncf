@@ -84,19 +84,50 @@
             overflow-y: auto;
             display: flex;
             flex-direction: column;
+            position: relative;
         }
         
         .stop-item {
-            padding: 30px 40px;
+            padding: 30px 40px 30px 80px;
             border-bottom: 2px solid #e0e0e0;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-shrink: 0;
+            position: relative;
         }
         
         .stop-item:last-child {
             border-bottom: none;
+        }
+        
+        /* Линия и точки */
+        .timeline {
+            position: absolute;
+            left: 40px;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background-color: #cccccc;
+        }
+        
+        .stop-dot {
+            position: absolute;
+            left: 34px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background-color: #cccccc;
+            z-index: 2;
+        }
+        
+        .stop-dot.active {
+            width: 20px;
+            height: 20px;
+            left: 32px;
+            box-shadow: 0 0 0 4px rgba(255, 204, 0, 0.3);
         }
         
         .stop-name {
@@ -137,6 +168,17 @@
             font-size: 36px;
             background: #f5f5f5;
             flex-shrink: 0;
+            position: relative;
+        }
+        
+        .more-stops-indicator::before {
+            content: '';
+            position: absolute;
+            left: 40px;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background-color: #cccccc;
         }
         
         .no-more-stops {
@@ -167,16 +209,6 @@
             color: #666;
             font-size: 18px;
             flex-shrink: 0;
-        }
-        
-        /* Анимация для обновления данных */
-        @keyframes highlight {
-            0% { background-color: rgba(255, 204, 0, 0.3); }
-            100% { background-color: transparent; }
-        }
-        
-        .updating {
-            animation: highlight 1s ease;
         }
         
         /* Стили для скроллбара */
@@ -210,6 +242,7 @@
         </div>
         
         <div class="stops-container" id="stops-container">
+            <div class="timeline"></div>
             <div class="loading" id="loading">Chargement des données...</div>
             <div class="error" id="error" style="display: none;"></div>
             <!-- Остановки будут добавляться сюда динамически -->
@@ -330,7 +363,8 @@
                     if (dep.vehicle_journey && dep.vehicle_journey.id === trainId) {
                         return {
                             lineCode: dep.display_informations?.code || dep.display_informations?.label || null,
-                            lineColor: dep.display_informations?.color ? "#" + dep.display_informations.color : "#0052a3"
+                            lineColor: dep.display_informations?.color ? "#" + dep.display_informations.color : "#0052a3",
+                            commercialMode: dep.display_informations?.commercial_mode || null
                         };
                     }
                 }
@@ -341,7 +375,8 @@
                         if (dep.display_informations?.headsign === trainHeadsign) {
                             return {
                                 lineCode: dep.display_informations?.code || dep.display_informations?.label || null,
-                                lineColor: dep.display_informations?.color ? "#" + dep.display_informations.color : "#0052a3"
+                                lineColor: dep.display_informations?.color ? "#" + dep.display_informations.color : "#0052a3",
+                                commercialMode: dep.display_informations?.commercial_mode || null
                             };
                         }
                     }
@@ -352,7 +387,8 @@
                     const dep = departures[0];
                     return {
                         lineCode: dep.display_informations?.code || dep.display_informations?.label || null,
-                        lineColor: dep.display_informations?.color ? "#" + dep.display_informations.color : "#0052a3"
+                        lineColor: dep.display_informations?.color ? "#" + dep.display_informations.color : "#0052a3",
+                        commercialMode: dep.display_informations?.commercial_mode || null
                     };
                 }
                 
@@ -361,6 +397,15 @@
                 console.error("Erreur lors de la récupération des infos de ligne:", error);
                 return null;
             }
+        }
+        
+        // Обработка длинных названий линий
+        function formatLineName(lineCode, commercialMode) {
+            // Если название линии длинное (больше 8 символов), используем commercial_mode
+            if (lineCode && lineCode.length > 8) {
+                return commercialMode || lineCode;
+            }
+            return lineCode;
         }
         
         // Charger les données du train
@@ -406,13 +451,15 @@
                 // Obtenir le nom de la ligne à partir du premier arrêt
                 let lineName = vehicleJourney.headsign || vehicleJourney.name || "?";
                 let lineColor = "#ffcc00";
+                let commercialMode = null;
                 
                 if (stopTimes.length > 0) {
                     const firstStopName = stopTimes[0].stop_point?.name;
                     const lineInfo = await getLineInfo(trainId, firstStopName, trainHeadsign);
                     
-                    if (lineInfo && lineInfo.lineCode) {
-                        lineName = lineInfo.lineCode;
+                    if (lineInfo) {
+                        commercialMode = lineInfo.commercialMode;
+                        lineName = formatLineName(lineInfo.lineCode, lineInfo.commercialMode) || lineName;
                         lineColor = lineInfo.lineColor;
                     }
                 }
@@ -439,16 +486,16 @@
                 document.getElementById('destination-name').textContent = destination;
                 
                 // Afficher les arrêts
-                displayStops(stopTimes);
+                displayStops(stopTimes, lineColor);
                 
             } catch (error) {
-                console.error("Erreur lors de l'analyse des данных:", error);
+                console.error("Erreur lors de l'analyse des données:", error);
                 showError("Erreur dans le format des données reçues.");
             }
         }
         
         // Afficher les arrêts
-        function displayStops(stopTimes) {
+        function displayStops(stopTimes, lineColor) {
             const stopsContainer = document.getElementById('stops-container');
             const moreIndicator = document.getElementById('more-indicator');
             const noMoreIndicator = document.getElementById('no-more-indicator');
@@ -457,6 +504,8 @@
             const loading = document.getElementById('loading');
             const error = document.getElementById('error');
             stopsContainer.innerHTML = '';
+            stopsContainer.appendChild(document.querySelector('.timeline') || document.createElement('div'));
+            
             if (loading.style.display !== 'none') stopsContainer.appendChild(loading);
             if (error.style.display !== 'none') stopsContainer.appendChild(error);
             
@@ -481,6 +530,15 @@
                 
                 const stopItem = document.createElement('div');
                 stopItem.className = 'stop-item';
+                
+                // Добавляем точку для остановки
+                const stopDot = document.createElement('div');
+                stopDot.className = 'stop-dot';
+                if (index === 0) {
+                    stopDot.classList.add('active');
+                }
+                stopDot.style.backgroundColor = lineColor || '#cccccc';
+                stopItem.appendChild(stopDot);
                 
                 const stopName = document.createElement('div');
                 stopName.className = 'stop-name';
@@ -516,6 +574,18 @@
                 stopItem.appendChild(stopTimeInfo);
                 stopsContainer.appendChild(stopItem);
             });
+            
+            // Обновляем цвет линии
+            const timeline = document.querySelector('.timeline');
+            if (timeline) {
+                timeline.style.backgroundColor = lineColor || '#cccccc';
+            }
+            
+            // Обновляем цвет линии в индикаторе
+            const moreIndicatorLine = document.getElementById('more-indicator');
+            if (moreIndicatorLine) {
+                moreIndicatorLine.style.setProperty('--line-color', lineColor || '#cccccc');
+            }
             
             // Afficher l'indicateur s'il reste plus de 4 arrêts après ceux affichés
             const remainingStops = stopTimes.length - (nextStopIndex + 4);
