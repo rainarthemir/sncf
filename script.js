@@ -30,7 +30,7 @@ function norm(str) {
 }
 
 function formatTimeFromNavitia(ts) {
-  if (!ts || ts.length < 13) return "—";
+  if (!ts || ts.length < 16) return "—";
   return ts.slice(9, 11) + "h" + ts.slice(11, 13);
 }
 
@@ -126,24 +126,27 @@ function renderBoard(departures) {
     const color = info.color ? ("#" + info.color) : "#0052a3";
     const canceled = info.status && info.status.toLowerCase().includes("cancelled");
 
-    const baseTs = st.base_departure_date_time || null;
-    const realTs = st.departure_date_time || null;
-    const delayM = Math.floor((st.departure_delay || 0) / 60);
+    // ИСПРАВЛЕННАЯ ЛОГИКА ВРЕМЕНИ И ЗАДЕРЖЕК
+    const baseTs = st.base_departure_date_time; // Теоретическое время
+    const realTs = st.departure_date_time; // Практическое время с задержками
+    const delayM = Math.floor((st.departure_delay || 0) / 60); // Задержка в минутах
 
-    let delayed = false, originalDisplay = null, newDisplay = null;
-    if (baseTs && realTs && baseTs !== realTs) {
-      delayed = true;
-      originalDisplay = formatTimeFromNavitia(baseTs);
-      newDisplay = formatTimeFromNavitia(realTs);
-    } else if (baseTs && delayM > 0) {
-      delayed = true;
-      originalDisplay = formatTimeFromNavitia(baseTs);
-      const baseMinutes = parseInt(baseTs.slice(9, 11)) * 60 + parseInt(baseTs.slice(11, 13));
-      const delayedMinutes = baseMinutes + delayM;
-      newDisplay = `${String(Math.floor(delayedMinutes / 60)).padStart(2, '0')}h${String(delayedMinutes % 60).padStart(2, '0')}`;
+    // ВСЕГДА используем реальное время для отображения
+    const displayedTime = formatTimeFromNavitia(realTs || baseTs);
+
+    let timeCell;
+    if (canceled) {
+      timeCell = `<span class="canceled-time">${displayedTime}</span>`;
+    } else if (delayM > 0) {
+      // Показываем реальное время + индикатор задержки
+      timeCell = `
+        <div class="time-with-delay">
+          <span class="delayed-time">${displayedTime}</span>
+          <div class="delay-indicator">+${delayM} min</div>
+        </div>
+      `;
     } else {
-      delayed = false;
-      originalDisplay = formatTimeFromNavitia(realTs || baseTs);
+      timeCell = `<span class="on-time">${displayedTime}</span>`;
     }
 
     // ===================== ЛОГОТИПЫ =====================
@@ -153,7 +156,6 @@ function renderBoard(departures) {
       
       const commercialMode = norm(info.commercial_mode || "");
 
-      // ТОЛЬКО commercial_mode - больше никаких других полей!
       if (commercialMode === "TGV" || commercialMode === "TGV INOUI") {
         logoHtml = '<img src="logo/inoui.svg" class="train-logo" alt="TGV Inoui">';
         textHtml = "TGV Inoui";
@@ -230,22 +232,13 @@ function renderBoard(departures) {
         logoHtml = '<img src="logo/transilien.svg" class="train-logo" alt="Transilien">';
         textHtml = "Transilien";
       }
-      // По умолчанию - показываем commercial_mode как есть
       else {
         textHtml = info.commercial_mode || "Autre";
-        // Для отладки можно раскомментировать следующую строку:
-        // console.log("Unknown commercial_mode:", info.commercial_mode, "normalized:", commercialMode);
       }
       return { logoHtml, textHtml };
     }
 
     const { logoHtml, textHtml } = getTrainLogo(info);
-
-    const timeCell = canceled
-      ? `<span class="canceled-time">${originalDisplay || "—"}</span>`
-      : delayed
-      ? `<span class="original-time">${originalDisplay}</span><span class="delayed-time">${newDisplay}</span>`
-      : `<span class="on-time">${originalDisplay}</span>`;
 
     const rowClass = index % 2 === 0 ? "train-row row-light" : "train-row row-dark";
     const clickableClass = vehicleJourneyId ? "clickable-train-row" : "";
@@ -256,7 +249,7 @@ function renderBoard(departures) {
         <div class="col-line"><span class="line-badge" style="background-color:${color}">${escapeHtml(lineDisplay)}</span></div>
         <div class="col-mission">${escapeHtml(mission)}</div>
         <div class="col-destination">${escapeHtml(destination)}</div>
-        <div class="col-time"><div class="time-with-delay">${timeCell}</div></div>
+        <div class="col-time">${timeCell}</div>
         <div class="col-type">${logoHtml} <span class="train-logo-text">${textHtml}</span></div>
       </div>
     `;
