@@ -30,10 +30,18 @@ function norm(str) {
 }
 
 function formatTimeFromNavitia(ts) {
-  if (!ts || ts.length < 16) return "—";
+  if (!ts) return "—";
+  
   // Формат: "20251110T183100" -> "18h31"
-  // Индексы: 0123456789012345
-  return ts.slice(9, 11) + "h" + ts.slice(11, 13);
+  // Простая проверка - если есть 'T' и длина достаточная
+  if (ts.includes('T') && ts.length >= 13) {
+    const timePart = ts.split('T')[1];
+    if (timePart && timePart.length >= 4) {
+      return timePart.substring(0, 2) + "h" + timePart.substring(2, 4);
+    }
+  }
+  
+  return "—";
 }
 
 // ===================== SEARCH =====================
