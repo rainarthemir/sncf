@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tableau de bord SNCF</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f5f5;
+            color: #333;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: #003366;
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .line-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .line-name {
+            font-size: 24px;
+            font-weight: bold;
+            background: #ffcc00;
+            color: #003366;
+            padding: 8px 15px;
+            border-radius: 4px;
+        }
+        
+        .train-number {
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        .current-time {
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        .destination {
+            padding: 25px 20px;
+            background: #f0f0f0;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .destination-label {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .destination-name {
+            font-size: 28px;
+            font-weight: bold;
+            color: #003366;
+        }
+        
+        .status {
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .next-stop {
+            flex: 1;
+        }
+        
+        .next-stop-label {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .next-stop-name {
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+        
+        .delay {
+            background: #ffcc00;
+            color: #003366;
+            padding: 8px 15px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        
+        .on-time {
+            background: #4CAF50;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        
+        .loading, .error {
+            padding: 40px 20px;
+            text-align: center;
+            font-size: 18px;
+        }
+        
+        .error {
+            color: #d32f2f;
+        }
+        
+        .footer {
+            padding: 15px 20px;
+            background: #f9f9f9;
+            border-top: 1px solid #ddd;
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .sncf-logo {
+            height: 30px;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="line-info">
+                <div class="line-name" id="line-name">Chargement...</div>
+                <div class="train-number" id="train-number"></div>
+            </div>
+            <div class="current-time" id="current-time">--:--:--</div>
+        </div>
+        
+        <div class="destination">
+            <div class="destination-label">DESTINATION</div>
+            <div class="destination-name" id="destination-name">Chargement...</div>
+        </div>
+        
+        <div class="status">
+            <div class="next-stop">
+                <div class="next-stop-label">PROCHAIN ARRÊT</div>
+                <div class="next-stop-name" id="next-stop-name">Chargement...</div>
+            </div>
+            <div class="delay" id="delay-status">À l'heure</div>
+        </div>
+        
+        <div class="loading" id="loading">Chargement des données...</div>
+        <div class="error" id="error" style="display: none;"></div>
+        
+        <div class="footer">
+            Information voyageur SNCF - Temps réel
+        </div>
+    </div>
+
+    <script>
+        // Mettre à jour l'heure en temps réel
+        function updateTime() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('fr-FR', { 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit' 
+            });
+            document.getElementById('current-time').textContent = timeString;
+        }
+        
+        // Mettre à jour l'heure toutes les secondes
+        setInterval(updateTime, 1000);
+        updateTime(); // Appel initial
+        
+        // Récupérer l'ID du train depuis l'URL
+        function getTrainIdFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('id');
+        }
+        
+        // Charger les données du train
+        async function loadTrainData() {
+            const trainId = getTrainIdFromUrl();
+            
+            if (!trainId) {
+                showError("ID du train manquant dans l'URL. Utilisez ?id=...");
+                return;
+            }
+            
+            try {
+                const response = await fetch(`https://api.dmytrothemir.workers.dev/?id=${encodeURIComponent(trainId)}`);
+                
+                if (!response.ok) {
+                    throw new Error(`Erreur HTTP: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                displayTrainData(data);
+                
+            } catch (error) {
+                console.error("Erreur lors du chargement des données:", error);
+                showError("Impossible de charger les données du train. Vérifiez l'ID.");
+            }
+        }
+        
+        // Afficher les données du train
+        function displayTrainData(data) {
+            document.getElementById('loading').style.display = 'none';
+            
+            // Ici, vous devrez adapter cette partie en fonction de la structure exacte
+            // de la réponse de l'API SNCF
+            try {
+                // Exemple d'extraction des données (à adapter selon la structure réelle)
+                const vehicleJourney = data.vehicle_journeys?.[0];
+                
+                if (!vehicleJourney) {
+                    showError("Aucune information trouvée pour ce train.");
+                    return;
+                }
+                
+                // Nom de la ligne (à adapter selon la structure réelle)
+                const lineName = vehicleJourney.route?.line?.name || "Ligne inconnue";
+                document.getElementById('line-name').textContent = lineName;
+                
+                // Numéro du train
+                const trainNumber = vehicleJourney.name || vehicleJourney.id?.split(':').pop() || "N/A";
+                document.getElementById('train-number').textContent = `Train ${trainNumber}`;
+                
+                // Destination (dernier arrêt)
+                const destination = vehicleJourney.journey_pattern?.route?.direction?.stop_area?.name || 
+                                  "Destination inconnue";
+                document.getElementById('destination-name').textContent = destination.toUpperCase();
+                
+                // Prochain arrêt (simulation - à adapter avec les données réelles)
+                document.getElementById('next-stop-name').textContent = "Gare de Lyon";
+                
+                // Statut de ponctualité (simulation - à adapter avec les données réelles)
+                document.getElementById('delay-status').textContent = "À l'heure";
+                document.getElementById('delay-status').className = "on-time";
+                
+            } catch (error) {
+                console.error("Erreur lors de l'analyse des données:", error);
+                showError("Erreur dans le format des données reçues.");
+            }
+        }
+        
+        // Afficher une erreur
+        function showError(message) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+            document.getElementById('error').textContent = message;
+        }
+        
+        // Charger les données au démarrage
+        document.addEventListener('DOMContentLoaded', loadTrainData);
+        
+        // Recharger les données toutes les 30 secondes
+        setInterval(loadTrainData, 30000);
+    </script>
+</body>
+</html>
