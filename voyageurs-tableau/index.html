@@ -141,17 +141,6 @@
             height: 30px;
             margin-right: 10px;
         }
-        
-        .debug {
-            margin-top: 20px;
-            padding: 15px;
-            background: #f9f9f9;
-            border-radius: 4px;
-            font-family: monospace;
-            font-size: 12px;
-            max-height: 200px;
-            overflow-y: auto;
-        }
     </style>
 </head>
 <body>
@@ -183,12 +172,11 @@
         <div class="footer">
             Information voyageur SNCF - Temps réel
         </div>
-        
-        <!-- Debug section (à cacher en production) -->
-        <div class="debug" id="debug" style="display: none;"></div>
     </div>
 
     <script>
+        const API_KEY = "e41a2be9-7450-4f1a-a7e6-eb429950186f";
+        
         // Mettre à jour l'heure en temps réel
         function updateTime() {
             const now = new Date();
@@ -246,6 +234,42 @@
             };
         }
         
+        // Obtenir le nom de la ligne à partir des données de départ
+        async function getLineName(trainId, firstStopId) {
+            if (!firstStopId) return null;
+            
+            try {
+                // Construire la date/heure actuelle au format Navitia
+                const now = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Paris" })
+                    .replace(/[-:T ]/g, "")
+                    .slice(0, 14);
+                
+                // Chercher les départs de cette gare
+                const url = `https://api.sncf.com/v1/coverage/sncf/stop_areas/${encodeURIComponent(firstStopId)}/departures?datetime=${now}&count=50`;
+                
+                const response = await fetch(url, {
+                    headers: { Authorization: "Basic " + btoa(API_KEY + ":") }
+                });
+                
+                if (!response.ok) return null;
+                
+                const data = await response.json();
+                const departures = data.departures || [];
+                
+                // Chercher notre train dans les départs
+                for (const dep of departures) {
+                    if (dep.vehicle_journey && dep.vehicle_journey.id === trainId) {
+                        return dep.display_informations?.code || null;
+                    }
+                }
+                
+                return null;
+            } catch (error) {
+                console.error("Erreur lors de la récupération du nom de ligne:", error);
+                return null;
+            }
+        }
+        
         // Charger les données du train
         async function loadTrainData() {
             const trainId = getTrainIdFromUrl();
@@ -263,12 +287,7 @@
                 }
                 
                 const data = await response.json();
-                
-                // Afficher les données brutes pour le débogage
-                document.getElementById('debug').style.display = 'block';
-                document.getElementById('debug').textContent = JSON.stringify(data, null, 2);
-                
-                displayTrainData(data);
+                displayTrainData(data, trainId);
                 
             } catch (error) {
                 console.error("Erreur lors du chargement des données:", error);
@@ -277,7 +296,7 @@
         }
         
         // Afficher les données du train
-        function displayTrainData(data) {
+        async function displayTrainData(data, trainId) {
             document.getElementById('loading').style.display = 'none';
             
             try {
@@ -288,18 +307,26 @@
                     return;
                 }
                 
-                // Nom de la ligne - utiliser headsign ou name
-                const lineName = vehicleJourney.headsign || vehicleJourney.name || "Ligne inconnue";
+                const stopTimes = vehicleJourney.stop_times || [];
+                
+                // Obtenir le nom de la ligne à partir du premier arrêt
+                let lineName = vehicleJourney.headsign || vehicleJourney.name || "Ligne inconnue";
+                if (stopTimes.length > 0) {
+                    const firstStopId = stopTimes[0].stop_point?.id;
+                    const fetchedLineName = await getLineName(trainId, firstStopId);
+                    if (fetchedLineName) {
+                        lineName = fetchedLineName;
+                    }
+                }
+                
                 document.getElementById('line-name').textContent = lineName;
                 
-                // Numéro du train - utiliser name ou extraire de l'ID
+                // Numéro du train
                 const trainNumber = vehicleJourney.name || vehicleJourney.id?.split(':').pop() || "N/A";
                 document.getElementById('train-number').textContent = `Train ${trainNumber}`;
                 
                 // Destination (dernier arrêt non sauté)
-                const stopTimes = vehicleJourney.stop_times || [];
                 let destination = "Destination inconnue";
-                
                 if (stopTimes.length > 0) {
                     // Trouver le dernier arrêt non sauté
                     for (let i = stopTimes.length - 1; i >= 0; i--) {
