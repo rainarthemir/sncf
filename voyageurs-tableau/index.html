@@ -15,50 +15,47 @@
         body {
             background-color: #003366;
             color: white;
-            padding: 20px;
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            height: 100vh;
+            overflow: hidden;
         }
         
         .board {
             width: 100%;
-            max-width: 800px;
+            height: 100%;
             background: white;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
         }
         
         .header {
             background: #003366;
-            padding: 20px 25px;
+            padding: 30px 40px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 3px solid #ffcc00;
+            border-bottom: 4px solid #ffcc00;
+            flex-shrink: 0;
         }
         
         .line-train-info {
             display: flex;
             align-items: center;
-            gap: 15px;
+            gap: 25px;
         }
         
         .line-badge {
-            font-size: 28px;
+            font-size: 42px;
             font-weight: bold;
             background: #ffcc00;
             color: #003366;
-            padding: 10px 20px;
-            border-radius: 6px;
-            min-width: 80px;
+            padding: 15px 30px;
+            border-radius: 8px;
+            min-width: 120px;
             text-align: center;
         }
         
         .train-number {
-            font-size: 22px;
+            font-size: 32px;
             font-weight: bold;
             color: white;
         }
@@ -66,32 +63,36 @@
         .destination {
             flex-grow: 1;
             text-align: center;
-            font-size: 24px;
+            font-size: 36px;
             font-weight: bold;
             color: white;
-            padding: 0 20px;
+            padding: 0 40px;
         }
         
         .current-time {
-            font-size: 22px;
+            font-size: 32px;
             font-weight: bold;
             color: white;
             background: rgba(255, 255, 255, 0.1);
-            padding: 10px 15px;
-            border-radius: 6px;
+            padding: 15px 25px;
+            border-radius: 8px;
         }
         
         .stops-container {
             background: white;
-            padding: 0;
+            flex-grow: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
         }
         
         .stop-item {
-            padding: 20px 25px;
-            border-bottom: 1px solid #e0e0e0;
+            padding: 30px 40px;
+            border-bottom: 2px solid #e0e0e0;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-shrink: 0;
         }
         
         .stop-item:last-child {
@@ -99,46 +100,59 @@
         }
         
         .stop-name {
-            font-size: 20px;
+            font-size: 32px;
             color: #333;
             font-weight: 500;
         }
         
         .stop-time {
-            font-size: 20px;
+            font-size: 32px;
             color: #333;
             font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 15px;
         }
         
         .stop-delay {
             color: #d32f2f;
-            font-size: 16px;
-            margin-left: 10px;
+            font-size: 24px;
+            background: rgba(211, 47, 47, 0.1);
+            padding: 5px 10px;
+            border-radius: 4px;
         }
         
         .stop-on-time {
             color: #4CAF50;
-            font-size: 16px;
-            margin-left: 10px;
+            font-size: 24px;
+            background: rgba(76, 175, 80, 0.1);
+            padding: 5px 10px;
+            border-radius: 4px;
         }
         
         .more-stops-indicator {
             text-align: center;
-            padding: 15px;
+            padding: 20px;
             color: #666;
-            font-size: 24px;
+            font-size: 36px;
             background: #f5f5f5;
+            flex-shrink: 0;
         }
         
         .no-more-stops {
-            height: 10px;
+            height: 20px;
+            flex-shrink: 0;
         }
         
         .loading, .error {
-            padding: 40px 20px;
+            padding: 60px 40px;
             text-align: center;
-            font-size: 18px;
+            font-size: 28px;
             color: #333;
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
         .error {
@@ -146,12 +160,13 @@
         }
         
         .footer {
-            padding: 15px 25px;
+            padding: 20px 40px;
             background: #f9f9f9;
-            border-top: 1px solid #ddd;
+            border-top: 2px solid #ddd;
             text-align: center;
             color: #666;
-            font-size: 14px;
+            font-size: 18px;
+            flex-shrink: 0;
         }
         
         /* Анимация для обновления данных */
@@ -162,6 +177,24 @@
         
         .updating {
             animation: highlight 1s ease;
+        }
+        
+        /* Стили для скроллбара */
+        .stops-container::-webkit-scrollbar {
+            width: 12px;
+        }
+        
+        .stops-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        
+        .stops-container::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 6px;
+        }
+        
+        .stops-container::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
         }
     </style>
 </head>
@@ -409,7 +442,7 @@
                 displayStops(stopTimes);
                 
             } catch (error) {
-                console.error("Erreur lors de l'analyse des données:", error);
+                console.error("Erreur lors de l'analyse des данных:", error);
                 showError("Erreur dans le format des données reçues.");
             }
         }
