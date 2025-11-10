@@ -84,11 +84,16 @@
         .stops-container {
             background: white;
             flex-grow: 1;
-            overflow-y: auto;
+            overflow: hidden;
             display: flex;
             flex-direction: column;
             position: relative;
-            transition: transform 0.5s ease;
+        }
+        
+        .stops-scroll-wrapper {
+            flex-grow: 1;
+            overflow-y: auto;
+            position: relative;
         }
         
         .timeline {
@@ -96,20 +101,20 @@
             left: 40px;
             top: 0;
             bottom: 0;
-            width: 6px; /* Увеличили толщину линии */
+            width: 6px;
             background-color: #cccccc;
             z-index: 1;
         }
         
         .stop-item {
-            padding: 30px 40px 30px 90px; /* Увеличили отступ слева для больших точек */
+            padding: 25px 40px 25px 90px;
             border-bottom: 2px solid #e0e0e0;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            flex-shrink: 0;
             position: relative;
-            transition: all 0.5s ease;
+            min-height: 80px;
+            box-sizing: border-box;
         }
         
         .stop-item:last-child {
@@ -118,16 +123,16 @@
         
         .stop-dot {
             position: absolute;
-            left: 35px; /* Подвинули для более толстой линии */
+            left: 35px;
             top: 50%;
             transform: translateY(-50%);
-            width: 22px; /* Увеличили размер точек */
+            width: 22px;
             height: 22px;
             border-radius: 50%;
             background-color: #cccccc;
             z-index: 2;
-            border: 3px solid white; /* Добавили белую обводку */
-            box-shadow: 0 0 0 1px #e0e0e0; /* Добавили тень для контраста */
+            border: 3px solid white;
+            box-shadow: 0 0 0 1px #e0e0e0;
         }
         
         .stop-dot.active {
@@ -138,75 +143,36 @@
         }
         
         .stop-name {
-            font-size: 32px;
+            font-size: 28px;
             color: #333;
             font-weight: 500;
+            flex: 1;
         }
         
         .stop-time {
-            font-size: 32px;
+            font-size: 28px;
             color: #333;
             font-weight: bold;
             display: flex;
             align-items: center;
             gap: 15px;
+            margin-left: 20px;
         }
         
         .stop-delay {
             color: #d32f2f;
-            font-size: 24px;
+            font-size: 20px;
             background: rgba(211, 47, 47, 0.1);
-            padding: 5px 10px;
+            padding: 4px 8px;
             border-radius: 4px;
         }
         
         .stop-on-time {
             color: #4CAF50;
-            font-size: 24px;
+            font-size: 20px;
             background: rgba(76, 175, 80, 0.1);
-            padding: 5px 10px;
+            padding: 4px 8px;
             border-radius: 4px;
-        }
-        
-        .more-stops-indicator {
-            text-align: center;
-            padding: 20px;
-            color: #666;
-            font-size: 36px;
-            background: #f5f5f5;
-            flex-shrink: 0;
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .more-stops-indicator::before {
-            content: '';
-            position: absolute;
-            left: 40px;
-            top: 0;
-            bottom: 0;
-            width: 6px; /* Увеличили толщину линии */
-            background-color: #cccccc;
-        }
-        
-        .more-stops-arrow {
-            position: absolute;
-            left: 37px; /* Расположили стрелку на линии */
-            top: 50%;
-            transform: translateY(-50%);
-            width: 30px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 3;
-        }
-        
-        .no-more-stops {
-            height: 20px;
-            flex-shrink: 0;
         }
         
         .loading, .error {
@@ -234,32 +200,92 @@
             flex-shrink: 0;
         }
         
-        /* Анимация движения табло */
-        @keyframes slideUp {
-            0% { transform: translateY(0); }
-            100% { transform: translateY(-100px); }
-        }
-        
-        .sliding-up {
-            animation: slideUp 0.8s ease forwards;
+        /* Анимация для плавного скролла к текущей остановке */
+        .smooth-scroll {
+            scroll-behavior: smooth;
         }
         
         /* Стили для скроллбара */
-        .stops-container::-webkit-scrollbar {
+        .stops-scroll-wrapper::-webkit-scrollbar {
             width: 12px;
         }
         
-        .stops-container::-webkit-scrollbar-track {
+        .stops-scroll-wrapper::-webkit-scrollbar-track {
             background: #f1f1f1;
         }
         
-        .stops-container::-webkit-scrollbar-thumb {
+        .stops-scroll-wrapper::-webkit-scrollbar-thumb {
             background: #c1c1c1;
             border-radius: 6px;
         }
         
-        .stops-container::-webkit-scrollbar-thumb:hover {
+        .stops-scroll-wrapper::-webkit-scrollbar-thumb:hover {
             background: #a8a8a8;
+        }
+        
+        /* Адаптивные стили для разных высот экрана */
+        @media (max-height: 700px) {
+            .stop-item {
+                padding: 20px 40px 20px 90px;
+                min-height: 70px;
+            }
+            
+            .stop-name, .stop-time {
+                font-size: 24px;
+            }
+            
+            .stop-dot {
+                width: 20px;
+                height: 20px;
+            }
+            
+            .stop-dot.active {
+                width: 24px;
+                height: 24px;
+            }
+        }
+        
+        @media (max-height: 600px) {
+            .stop-item {
+                padding: 15px 40px 15px 90px;
+                min-height: 60px;
+            }
+            
+            .stop-name, .stop-time {
+                font-size: 22px;
+            }
+            
+            .header {
+                padding: 20px 30px;
+            }
+            
+            .line-badge {
+                font-size: 36px;
+                padding: 12px 25px;
+            }
+            
+            .train-number, .current-time {
+                font-size: 28px;
+            }
+            
+            .destination {
+                font-size: 30px;
+            }
+        }
+        
+        @media (max-height: 500px) {
+            .stop-item {
+                padding: 12px 40px 12px 90px;
+                min-height: 50px;
+            }
+            
+            .stop-name, .stop-time {
+                font-size: 20px;
+            }
+            
+            .stop-delay, .stop-on-time {
+                font-size: 16px;
+            }
         }
     </style>
 </head>
@@ -274,17 +300,14 @@
             <div class="current-time" id="current-time">--:--:--</div>
         </div>
         
-        <div class="stops-container" id="stops-container">
-            <div class="timeline" id="timeline"></div>
-            <div class="loading" id="loading">Chargement des données...</div>
-            <div class="error" id="error" style="display: none;"></div>
-            <!-- Остановки будут добавляться сюда динамически -->
+        <div class="stops-container">
+            <div class="stops-scroll-wrapper" id="stops-scroll-wrapper">
+                <div class="timeline" id="timeline"></div>
+                <div class="loading" id="loading">Chargement des données...</div>
+                <div class="error" id="error" style="display: none;"></div>
+                <!-- Все остановки будут добавляться сюда динамически -->
+            </div>
         </div>
-        
-        <div class="more-stops-indicator" id="more-indicator" style="display: none;">
-            <div class="more-stops-arrow">▼</div>
-        </div>
-        <div class="no-more-stops" id="no-more-indicator"></div>
         
         <div class="footer">
             Information voyageur SNCF - Temps réel
@@ -295,6 +318,7 @@
         const API_KEY = "e41a2be9-7450-4f1a-a7e6-eb429950186f";
         let currentNextStopIndex = -1;
         let currentLineColor = "#cccccc";
+        let allStopItems = [];
         
         // Mettre à jour l'heure en temps réel
         function updateTime() {
@@ -445,6 +469,18 @@
             return lineCode;
         }
         
+        // Calculer la hauteur optimale pour les éléments d'arrêt
+        function calculateOptimalStopHeight() {
+            const stopsContainer = document.querySelector('.stops-scroll-wrapper');
+            const header = document.querySelector('.header');
+            const footer = document.querySelector('.footer');
+            
+            const availableHeight = window.innerHeight - header.offsetHeight - footer.offsetHeight;
+            const estimatedStopHeight = 80; // Hauteur estimée d'un arrêt en px
+            
+            return Math.max(60, Math.min(100, availableHeight / 8)); // Limiter entre 60px et 100px
+        }
+        
         // Charger les données du train
         async function loadTrainData() {
             const trainId = getTrainIdFromUrl();
@@ -506,7 +542,7 @@
                 
                 // Numéro du train (без слова "Train")
                 const trainNumber = vehicleJourney.name || vehicleJourney.id?.split(':').pop() || "N/A";
-                document.getElementById('train-number').textContent = trainNumber; // Убрали "Train "
+                document.getElementById('train-number').textContent = trainNumber;
                 
                 // Destination (dernier arrêt non sauté)
                 let destination = "Destination inconnue";
@@ -533,12 +569,12 @@
         
         // Afficher les arrêts
         function displayStops(stopTimes, lineColor) {
-            const stopsContainer = document.getElementById('stops-container');
-            const moreIndicator = document.getElementById('more-indicator');
-            const noMoreIndicator = document.getElementById('no-more-indicator');
+            const stopsScrollWrapper = document.getElementById('stops-scroll-wrapper');
             const timeline = document.getElementById('timeline');
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
             
-            // Сохраняем цвет линии для использования в анимации
+            // Сохраняем цвет линии для использования
             currentLineColor = lineColor || '#cccccc';
             
             // Обновляем цвет линии маршрута
@@ -546,55 +582,35 @@
                 timeline.style.backgroundColor = currentLineColor;
             }
             
-            // Обновляем цвет линии в индикаторе
-            const moreIndicatorBefore = document.querySelector('.more-stops-indicator::before');
-            if (moreIndicatorBefore) {
-                moreIndicatorBefore.style.backgroundColor = currentLineColor;
-            }
+            // Включаем плавный скролл
+            stopsScrollWrapper.classList.add('smooth-scroll');
             
-            // Effacer le contenu précédent sauf loading/error и timeline
-            const loading = document.getElementById('loading');
-            const error = document.getElementById('error');
-            
-            // Удаляем все дочерние элементы кроме timeline, loading и error
-            const children = Array.from(stopsContainer.children);
+            // Effacer le contenu précédent sauf timeline, loading и error
+            const children = Array.from(stopsScrollWrapper.children);
             for (const child of children) {
                 if (child.id !== 'timeline' && child.id !== 'loading' && child.id !== 'error') {
-                    stopsContainer.removeChild(child);
+                    stopsScrollWrapper.removeChild(child);
                 }
             }
             
-            if (loading.style.display !== 'none') stopsContainer.appendChild(loading);
-            if (error.style.display !== 'none') stopsContainer.appendChild(error);
+            if (loading.style.display !== 'none') stopsScrollWrapper.appendChild(loading);
+            if (error.style.display !== 'none') stopsScrollWrapper.appendChild(error);
             
             if (stopTimes.length === 0) {
                 const noStops = document.createElement('div');
                 noStops.className = 'loading';
                 noStops.textContent = 'Aucun arrêt trouvé';
-                stopsContainer.appendChild(noStops);
-                moreIndicator.style.display = 'none';
-                noMoreIndicator.style.display = 'block';
+                stopsScrollWrapper.appendChild(noStops);
                 return;
             }
             
             // Trouver l'index du prochain arrêt
             const nextStopIndex = findNextStopIndex(stopTimes);
             
-            // Проверяем, изменился ли индекс следующей остановки для анимации
-            if (currentNextStopIndex !== -1 && currentNextStopIndex !== nextStopIndex) {
-                // Добавляем анимацию сдвига
-                stopsContainer.classList.add('sliding-up');
-                setTimeout(() => {
-                    stopsContainer.classList.remove('sliding-up');
-                }, 800);
-            }
+            // Créer des éléments pour tous les arrêts
+            allStopItems = [];
             
-            currentNextStopIndex = nextStopIndex;
-            
-            // Afficher jusqu'à 4 arrêts à partir du prochain
-            const stopsToShow = stopTimes.slice(nextStopIndex, nextStopIndex + 4);
-            
-            stopsToShow.forEach((stop, index) => {
+            stopTimes.forEach((stop, index) => {
                 if (stop.skipped_stop) return;
                 
                 const stopItem = document.createElement('div');
@@ -603,7 +619,7 @@
                 // Добавляем точку для остановки
                 const stopDot = document.createElement('div');
                 stopDot.className = 'stop-dot';
-                if (index === 0) {
+                if (index === nextStopIndex) {
                     stopDot.classList.add('active');
                 }
                 stopDot.style.backgroundColor = currentLineColor;
@@ -622,8 +638,8 @@
                 
                 stopTimeInfo.textContent = timeDisplay;
                 
-                // Calculer le retard
-                if (scheduledTime) {
+                // Calculer le retard (seulement pour les arrêts actuels et futurs)
+                if (index >= nextStopIndex && scheduledTime) {
                     const delayMinutes = Math.round((now - scheduledTime) / (1000 * 60));
                     
                     if (delayMinutes > 1) {
@@ -631,7 +647,7 @@
                         delaySpan.className = 'stop-delay';
                         delaySpan.textContent = `+${delayMinutes} min`;
                         stopTimeInfo.appendChild(delaySpan);
-                    } else if (index === 0) {
+                    } else if (index === nextStopIndex) {
                         const onTimeSpan = document.createElement('span');
                         onTimeSpan.className = 'stop-on-time';
                         onTimeSpan.textContent = `À l'heure`;
@@ -641,23 +657,25 @@
                 
                 stopItem.appendChild(stopName);
                 stopItem.appendChild(stopTimeInfo);
-                stopsContainer.appendChild(stopItem);
+                stopsScrollWrapper.appendChild(stopItem);
+                
+                allStopItems.push({
+                    element: stopItem,
+                    index: index
+                });
             });
             
-            // Afficher l'indicateur s'il reste plus de 4 arrêts après ceux affichés
-            const remainingStops = stopTimes.length - (nextStopIndex + 4);
-            if (remainingStops > 0) {
-                moreIndicator.style.display = 'block';
-                noMoreIndicator.style.display = 'none';
-                
-                // Обновляем цвет стрелки
-                const arrow = moreIndicator.querySelector('.more-stops-arrow');
-                if (arrow) {
-                    arrow.style.color = currentLineColor;
+            // Прокручиваем к текущей остановке, если она изменилась
+            if (currentNextStopIndex !== nextStopIndex && allStopItems.length > nextStopIndex) {
+                const currentStopElement = allStopItems[nextStopIndex].element;
+                if (currentStopElement) {
+                    // Плавная прокрутка к текущей остановке
+                    currentStopElement.scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'center' 
+                    });
                 }
-            } else {
-                moreIndicator.style.display = 'none';
-                noMoreIndicator.style.display = 'block';
+                currentNextStopIndex = nextStopIndex;
             }
         }
         
@@ -668,8 +686,22 @@
             document.getElementById('error').textContent = message;
         }
         
+        // Адаптация размера элементов при изменении размера окна
+        function handleResize() {
+            // При изменении размера окна пересчитываем оптимальные размеры
+            const stopItems = document.querySelectorAll('.stop-item');
+            const optimalHeight = calculateOptimalStopHeight();
+            
+            stopItems.forEach(item => {
+                item.style.minHeight = `${optimalHeight}px`;
+            });
+        }
+        
         // Charger les données au démarrage
-        document.addEventListener('DOMContentLoaded', loadTrainData);
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTrainData();
+            window.addEventListener('resize', handleResize);
+        });
         
         // Recharger les données toutes les 30 secondes
         setInterval(loadTrainData, 30000);
