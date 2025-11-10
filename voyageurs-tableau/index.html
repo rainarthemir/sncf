@@ -13,115 +13,132 @@
         }
         
         body {
-            background-color: #f5f5f5;
-            color: #333;
+            background-color: #003366;
+            color: white;
             padding: 20px;
             min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
         
-        .container {
+        .board {
+            width: 100%;
             max-width: 800px;
-            margin: 0 auto;
             background: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
             overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         }
         
         .header {
             background: #003366;
-            color: white;
-            padding: 20px;
+            padding: 20px 25px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            border-bottom: 3px solid #ffcc00;
         }
         
-        .line-info {
+        .line-train-info {
             display: flex;
             align-items: center;
             gap: 15px;
         }
         
-        .line-name {
-            font-size: 24px;
+        .line-badge {
+            font-size: 28px;
             font-weight: bold;
             background: #ffcc00;
             color: #003366;
-            padding: 8px 15px;
-            border-radius: 4px;
+            padding: 10px 20px;
+            border-radius: 6px;
+            min-width: 80px;
+            text-align: center;
         }
         
         .train-number {
-            font-size: 20px;
+            font-size: 22px;
             font-weight: bold;
-        }
-        
-        .current-time {
-            font-size: 20px;
-            font-weight: bold;
+            color: white;
         }
         
         .destination {
-            padding: 25px 20px;
-            background: #f0f0f0;
-            border-bottom: 1px solid #ddd;
-        }
-        
-        .destination-label {
-            font-size: 16px;
-            color: #666;
-            margin-bottom: 5px;
-        }
-        
-        .destination-name {
-            font-size: 28px;
+            flex-grow: 1;
+            text-align: center;
+            font-size: 24px;
             font-weight: bold;
-            color: #003366;
+            color: white;
+            padding: 0 20px;
         }
         
-        .status {
-            padding: 20px;
+        .current-time {
+            font-size: 22px;
+            font-weight: bold;
+            color: white;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 15px;
+            border-radius: 6px;
+        }
+        
+        .stops-container {
+            background: white;
+            padding: 0;
+        }
+        
+        .stop-item {
+            padding: 20px 25px;
+            border-bottom: 1px solid #e0e0e0;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
         
-        .next-stop {
-            flex: 1;
+        .stop-item:last-child {
+            border-bottom: none;
         }
         
-        .next-stop-label {
-            font-size: 14px;
+        .stop-name {
+            font-size: 20px;
+            color: #333;
+            font-weight: 500;
+        }
+        
+        .stop-time {
+            font-size: 20px;
+            color: #333;
+            font-weight: bold;
+        }
+        
+        .stop-delay {
+            color: #d32f2f;
+            font-size: 16px;
+            margin-left: 10px;
+        }
+        
+        .stop-on-time {
+            color: #4CAF50;
+            font-size: 16px;
+            margin-left: 10px;
+        }
+        
+        .more-stops-indicator {
+            text-align: center;
+            padding: 15px;
             color: #666;
+            font-size: 24px;
+            background: #f5f5f5;
         }
         
-        .next-stop-name {
-            font-size: 18px;
-            font-weight: bold;
-            margin-top: 5px;
-        }
-        
-        .delay {
-            background: #ffcc00;
-            color: #003366;
-            padding: 8px 15px;
-            border-radius: 4px;
-            font-weight: bold;
-        }
-        
-        .on-time {
-            background: #4CAF50;
-            color: white;
-            padding: 8px 15px;
-            border-radius: 4px;
-            font-weight: bold;
+        .no-more-stops {
+            height: 10px;
         }
         
         .loading, .error {
             padding: 40px 20px;
             text-align: center;
             font-size: 18px;
+            color: #333;
         }
         
         .error {
@@ -129,40 +146,44 @@
         }
         
         .footer {
-            padding: 15px 20px;
+            padding: 15px 25px;
             background: #f9f9f9;
             border-top: 1px solid #ddd;
             text-align: center;
             color: #666;
             font-size: 14px;
         }
+        
+        /* Анимация для обновления данных */
+        @keyframes highlight {
+            0% { background-color: rgba(255, 204, 0, 0.3); }
+            100% { background-color: transparent; }
+        }
+        
+        .updating {
+            animation: highlight 1s ease;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="board">
         <div class="header">
-            <div class="line-info">
-                <div class="line-name" id="line-name">Chargement...</div>
+            <div class="line-train-info">
+                <div class="line-badge" id="line-name">...</div>
                 <div class="train-number" id="train-number"></div>
             </div>
+            <div class="destination" id="destination-name">...</div>
             <div class="current-time" id="current-time">--:--:--</div>
         </div>
         
-        <div class="destination">
-            <div class="destination-label">DESTINATION</div>
-            <div class="destination-name" id="destination-name">Chargement...</div>
+        <div class="stops-container" id="stops-container">
+            <div class="loading" id="loading">Chargement des données...</div>
+            <div class="error" id="error" style="display: none;"></div>
+            <!-- Остановки будут добавляться сюда динамически -->
         </div>
         
-        <div class="status">
-            <div class="next-stop">
-                <div class="next-stop-label">PROCHAIN ARRÊT</div>
-                <div class="next-stop-name" id="next-stop-name">Chargement...</div>
-            </div>
-            <div class="delay" id="delay-status">À l'heure</div>
-        </div>
-        
-        <div class="loading" id="loading">Chargement des données...</div>
-        <div class="error" id="error" style="display: none;"></div>
+        <div class="more-stops-indicator" id="more-indicator" style="display: none;">▼</div>
+        <div class="no-more-stops" id="no-more-indicator"></div>
         
         <div class="footer">
             Information voyageur SNCF - Temps réel
@@ -206,8 +227,17 @@
             return date;
         }
         
+        // Formater l'heure pour l'affichage
+        function formatTime(date) {
+            if (!date) return "--:--";
+            return date.toLocaleTimeString('fr-FR', { 
+                hour: '2-digit', 
+                minute: '2-digit'
+            });
+        }
+        
         // Trouver la prochaine arrêt
-        function findNextStop(stopTimes) {
+        function findNextStopIndex(stopTimes) {
             const now = new Date();
             
             for (let i = 0; i < stopTimes.length; i++) {
@@ -215,18 +245,12 @@
                 const departureTime = parseTime(stop.departure_time, now);
                 
                 if (departureTime && departureTime > now) {
-                    return {
-                        stop: stop,
-                        index: i
-                    };
+                    return i;
                 }
             }
             
             // Si aucun arrêt futur, retourner le dernier arrêt
-            return {
-                stop: stopTimes[stopTimes.length - 1],
-                index: stopTimes.length - 1
-            };
+            return stopTimes.length - 1;
         }
         
         // Obtenir le nom de la ligne à partir des données de départ
@@ -347,8 +371,8 @@
                 const trainHeadsign = vehicleJourney.headsign;
                 
                 // Obtenir le nom de la ligne à partir du premier arrêt
-                let lineName = vehicleJourney.headsign || vehicleJourney.name || "Ligne inconnue";
-                let lineColor = "#0052a3";
+                let lineName = vehicleJourney.headsign || vehicleJourney.name || "?";
+                let lineColor = "#ffcc00";
                 
                 if (stopTimes.length > 0) {
                     const firstStopName = stopTimes[0].stop_point?.name;
@@ -379,41 +403,95 @@
                     }
                 }
                 
-                document.getElementById('destination-name').textContent = destination.toUpperCase();
+                document.getElementById('destination-name').textContent = destination;
                 
-                // Prochain arrêt
-                if (stopTimes.length > 0) {
-                    const nextStopInfo = findNextStop(stopTimes);
-                    const nextStop = nextStopInfo.stop;
-                    
-                    if (nextStop && !nextStop.skipped_stop) {
-                        document.getElementById('next-stop-name').textContent = nextStop.stop_point?.name || "Arrêt inconnu";
-                        
-                        // Calculer si le train est en retard
-                        const now = new Date();
-                        const scheduledTime = parseTime(nextStop.departure_time || nextStop.arrival_time, now);
-                        
-                        if (scheduledTime) {
-                            const delayMinutes = Math.round((now - scheduledTime) / (1000 * 60));
-                            
-                            if (delayMinutes > 1) {
-                                document.getElementById('delay-status').textContent = `+${delayMinutes} min`;
-                                document.getElementById('delay-status').className = "delay";
-                            } else {
-                                document.getElementById('delay-status').textContent = "À l'heure";
-                                document.getElementById('delay-status').className = "on-time";
-                            }
-                        }
-                    } else {
-                        document.getElementById('next-stop-name').textContent = "Terminus";
-                    }
-                } else {
-                    document.getElementById('next-stop-name').textContent = "Aucun arrêt";
-                }
+                // Afficher les arrêts
+                displayStops(stopTimes);
                 
             } catch (error) {
                 console.error("Erreur lors de l'analyse des données:", error);
                 showError("Erreur dans le format des données reçues.");
+            }
+        }
+        
+        // Afficher les arrêts
+        function displayStops(stopTimes) {
+            const stopsContainer = document.getElementById('stops-container');
+            const moreIndicator = document.getElementById('more-indicator');
+            const noMoreIndicator = document.getElementById('no-more-indicator');
+            
+            // Effacer le contenu précédent sauf loading/error
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            stopsContainer.innerHTML = '';
+            if (loading.style.display !== 'none') stopsContainer.appendChild(loading);
+            if (error.style.display !== 'none') stopsContainer.appendChild(error);
+            
+            if (stopTimes.length === 0) {
+                const noStops = document.createElement('div');
+                noStops.className = 'loading';
+                noStops.textContent = 'Aucun arrêt trouvé';
+                stopsContainer.appendChild(noStops);
+                moreIndicator.style.display = 'none';
+                noMoreIndicator.style.display = 'block';
+                return;
+            }
+            
+            // Trouver l'index du prochain arrêt
+            const nextStopIndex = findNextStopIndex(stopTimes);
+            
+            // Afficher jusqu'à 4 arrêts à partir du prochain
+            const stopsToShow = stopTimes.slice(nextStopIndex, nextStopIndex + 4);
+            
+            stopsToShow.forEach((stop, index) => {
+                if (stop.skipped_stop) return;
+                
+                const stopItem = document.createElement('div');
+                stopItem.className = 'stop-item';
+                
+                const stopName = document.createElement('div');
+                stopName.className = 'stop-name';
+                stopName.textContent = stop.stop_point?.name || 'Arrêt inconnu';
+                
+                const stopTimeInfo = document.createElement('div');
+                stopTimeInfo.className = 'stop-time';
+                
+                const now = new Date();
+                const scheduledTime = parseTime(stop.departure_time || stop.arrival_time, now);
+                const timeDisplay = formatTime(scheduledTime);
+                
+                stopTimeInfo.textContent = timeDisplay;
+                
+                // Calculer le retard
+                if (scheduledTime) {
+                    const delayMinutes = Math.round((now - scheduledTime) / (1000 * 60));
+                    
+                    if (delayMinutes > 1) {
+                        const delaySpan = document.createElement('span');
+                        delaySpan.className = 'stop-delay';
+                        delaySpan.textContent = `+${delayMinutes} min`;
+                        stopTimeInfo.appendChild(delaySpan);
+                    } else if (index === 0) {
+                        const onTimeSpan = document.createElement('span');
+                        onTimeSpan.className = 'stop-on-time';
+                        onTimeSpan.textContent = `À l'heure`;
+                        stopTimeInfo.appendChild(onTimeSpan);
+                    }
+                }
+                
+                stopItem.appendChild(stopName);
+                stopItem.appendChild(stopTimeInfo);
+                stopsContainer.appendChild(stopItem);
+            });
+            
+            // Afficher l'indicateur s'il reste plus de 4 arrêts après ceux affichés
+            const remainingStops = stopTimes.length - (nextStopIndex + 4);
+            if (remainingStops > 0) {
+                moreIndicator.style.display = 'block';
+                noMoreIndicator.style.display = 'none';
+            } else {
+                moreIndicator.style.display = 'none';
+                noMoreIndicator.style.display = 'block';
             }
         }
         
