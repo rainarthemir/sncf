@@ -47,7 +47,7 @@
             font-size: 42px;
             font-weight: bold;
             background: #ffcc00;
-            color: #003366;
+            color: white; /* Изменено на белый */
             padding: 15px 30px;
             border-radius: 8px;
             min-width: 120px;
@@ -87,6 +87,16 @@
             position: relative;
         }
         
+        .timeline {
+            position: absolute;
+            left: 40px;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background-color: #cccccc;
+            z-index: 1;
+        }
+        
         .stop-item {
             padding: 30px 40px 30px 80px;
             border-bottom: 2px solid #e0e0e0;
@@ -99,16 +109,6 @@
         
         .stop-item:last-child {
             border-bottom: none;
-        }
-        
-        /* Линия и точки */
-        .timeline {
-            position: absolute;
-            left: 40px;
-            top: 0;
-            bottom: 0;
-            width: 4px;
-            background-color: #cccccc;
         }
         
         .stop-dot {
@@ -242,7 +242,7 @@
         </div>
         
         <div class="stops-container" id="stops-container">
-            <div class="timeline"></div>
+            <div class="timeline" id="timeline"></div>
             <div class="loading" id="loading">Chargement des données...</div>
             <div class="error" id="error" style="display: none;"></div>
             <!-- Остановки будут добавляться сюда динамически -->
@@ -499,12 +499,31 @@
             const stopsContainer = document.getElementById('stops-container');
             const moreIndicator = document.getElementById('more-indicator');
             const noMoreIndicator = document.getElementById('no-more-indicator');
+            const timeline = document.getElementById('timeline');
             
-            // Effacer le contenu précédent sauf loading/error
+            // Обновляем цвет линии маршрута
+            if (timeline) {
+                timeline.style.backgroundColor = lineColor || '#cccccc';
+            }
+            
+            // Обновляем цвет линии в индикаторе
+            const moreIndicatorLine = moreIndicator.querySelector('::before');
+            if (moreIndicatorLine) {
+                moreIndicatorLine.style.backgroundColor = lineColor || '#cccccc';
+            }
+            
+            // Effacer le contenu précédent sauf loading/error и timeline
             const loading = document.getElementById('loading');
             const error = document.getElementById('error');
-            stopsContainer.innerHTML = '';
-            stopsContainer.appendChild(document.querySelector('.timeline') || document.createElement('div'));
+            
+            // Удаляем все дочерние элементы кроме timeline, loading и error
+            const children = stopsContainer.children;
+            for (let i = children.length - 1; i >= 0; i--) {
+                const child = children[i];
+                if (child.id !== 'timeline' && child.id !== 'loading' && child.id !== 'error') {
+                    stopsContainer.removeChild(child);
+                }
+            }
             
             if (loading.style.display !== 'none') stopsContainer.appendChild(loading);
             if (error.style.display !== 'none') stopsContainer.appendChild(error);
@@ -574,18 +593,6 @@
                 stopItem.appendChild(stopTimeInfo);
                 stopsContainer.appendChild(stopItem);
             });
-            
-            // Обновляем цвет линии
-            const timeline = document.querySelector('.timeline');
-            if (timeline) {
-                timeline.style.backgroundColor = lineColor || '#cccccc';
-            }
-            
-            // Обновляем цвет линии в индикаторе
-            const moreIndicatorLine = document.getElementById('more-indicator');
-            if (moreIndicatorLine) {
-                moreIndicatorLine.style.setProperty('--line-color', lineColor || '#cccccc');
-            }
             
             // Afficher l'indicateur s'il reste plus de 4 arrêts après ceux affichés
             const remainingStops = stopTimes.length - (nextStopIndex + 4);
