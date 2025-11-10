@@ -136,11 +136,6 @@
             color: #666;
             font-size: 14px;
         }
-        
-        .sncf-logo {
-            height: 30px;
-            margin-right: 10px;
-        }
     </style>
 </head>
 <body>
@@ -235,8 +230,8 @@
         }
         
         // Obtenir le nom de la ligne à partir des données de départ
-        async function getLineName(trainId, firstStopId) {
-            if (!firstStopId) return null;
+        async function getLineInfo(trainId, firstStopName) {
+            if (!firstStopName) return null;
             
             try {
                 // Construire la date/heure actuelle au format Navitia
@@ -244,28 +239,49 @@
                     .replace(/[-:T ]/g, "")
                     .slice(0, 14);
                 
-                // Chercher les départs de cette gare
-                const url = `https://api.sncf.com/v1/coverage/sncf/stop_areas/${encodeURIComponent(firstStopId)}/departures?datetime=${now}&count=50`;
+                // Chercher la gare par nom
+                const searchUrl = `https://api.sncf.com/v1/coverage/sncf/places?q=${encodeURIComponent(firstStopName)}&type[]=stop_area&count=10`;
                 
-                const response = await fetch(url, {
+                const searchResponse = await fetch(searchUrl, {
                     headers: { Authorization: "Basic " + btoa(API_KEY + ":") }
                 });
                 
-                if (!response.ok) return null;
+                if (!searchResponse.ok) return null;
                 
-                const data = await response.json();
-                const departures = data.departures || [];
+                const searchData = await searchResponse.json();
+                const places = searchData.places || [];
+                
+                if (places.length === 0) return null;
+                
+                // Prendre le premier résultat
+                const stopAreaId = places[0].id;
+                
+                // Chercher les départs de cette gare
+                const departuresUrl = `https://api.sncf.com/v1/coverage/sncf/stop_areas/${stopAreaId}/departures?datetime=${now}&count=50`;
+                
+                const departuresResponse = await fetch(departuresUrl, {
+                    headers: { Authorization: "Basic " + btoa(API_KEY + ":") }
+                });
+                
+                if (!departuresResponse.ok) return null;
+                
+                const departuresData = await departuresResponse.json();
+                const departures = departuresData.departures || [];
                 
                 // Chercher notre train dans les départs
                 for (const dep of departures) {
                     if (dep.vehicle_journey && dep.vehicle_journey.id === trainId) {
-                        return dep.display_informations?.code || null;
+                        return {
+                            lineCode: dep.display_informations?.code || null,
+                            lineColor: dep.display_informations?.color ? "#" + dep.display_informations.color : "#0052a3",
+                            commercialMode: dep.display_informations?.commercial_mode || null
+                        };
                     }
                 }
                 
                 return null;
             } catch (error) {
-                console.error("Erreur lors de la récupération du nom de ligne:", error);
+                console.error("Erreur lors de la récupération des infos de ligne:", error);
                 return null;
             }
         }
@@ -311,15 +327,20 @@
                 
                 // Obtenir le nom de la ligne à partir du premier arrêt
                 let lineName = vehicleJourney.headsign || vehicleJourney.name || "Ligne inconnue";
+                let lineColor = "#0052a3";
+                
                 if (stopTimes.length > 0) {
-                    const firstStopId = stopTimes[0].stop_point?.id;
-                    const fetchedLineName = await getLineName(trainId, firstStopId);
-                    if (fetchedLineName) {
-                        lineName = fetchedLineName;
+                    const firstStopName = stopTimes[0].stop_point?.name;
+                    const lineInfo = await getLineInfo(trainId, firstStopName);
+                    
+                    if (lineInfo && lineInfo.lineCode) {
+                        lineName = lineInfo.lineCode;
+                        lineColor = lineInfo.lineColor;
                     }
                 }
                 
                 document.getElementById('line-name').textContent = lineName;
+                document.getElementById('line-name').style.backgroundColor = lineColor;
                 
                 // Numéro du train
                 const trainNumber = vehicleJourney.name || vehicleJourney.id?.split(':').pop() || "N/A";
