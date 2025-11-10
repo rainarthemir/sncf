@@ -141,6 +141,17 @@
             height: 30px;
             margin-right: 10px;
         }
+        
+        .debug {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
     </style>
 </head>
 <body>
@@ -172,6 +183,9 @@
         <div class="footer">
             Information voyageur SNCF - Temps réel
         </div>
+        
+        <!-- Debug section (à cacher en production) -->
+        <div class="debug" id="debug" style="display: none;"></div>
     </div>
 
     <script>
@@ -196,6 +210,42 @@
             return urlParams.get('id');
         }
         
+        // Convertir le temps HHMMSS en objet Date
+        function parseTime(timeStr, baseDate) {
+            if (!timeStr || timeStr.length !== 6) return null;
+            
+            const hours = parseInt(timeStr.substring(0, 2));
+            const minutes = parseInt(timeStr.substring(2, 4));
+            const seconds = parseInt(timeStr.substring(4, 6));
+            
+            const date = new Date(baseDate);
+            date.setHours(hours, minutes, seconds, 0);
+            return date;
+        }
+        
+        // Trouver la prochaine arrêt
+        function findNextStop(stopTimes) {
+            const now = new Date();
+            
+            for (let i = 0; i < stopTimes.length; i++) {
+                const stop = stopTimes[i];
+                const departureTime = parseTime(stop.departure_time, now);
+                
+                if (departureTime && departureTime > now) {
+                    return {
+                        stop: stop,
+                        index: i
+                    };
+                }
+            }
+            
+            // Si aucun arrêt futur, retourner le dernier arrêt
+            return {
+                stop: stopTimes[stopTimes.length - 1],
+                index: stopTimes.length - 1
+            };
+        }
+        
         // Charger les données du train
         async function loadTrainData() {
             const trainId = getTrainIdFromUrl();
@@ -213,6 +263,11 @@
                 }
                 
                 const data = await response.json();
+                
+                // Afficher les données brutes pour le débogage
+                document.getElementById('debug').style.display = 'block';
+                document.getElementById('debug').textContent = JSON.stringify(data, null, 2);
+                
                 displayTrainData(data);
                 
             } catch (error) {
@@ -225,10 +280,7 @@
         function displayTrainData(data) {
             document.getElementById('loading').style.display = 'none';
             
-            // Ici, vous devrez adapter cette partie en fonction de la structure exacte
-            // de la réponse de l'API SNCF
             try {
-                // Exemple d'extraction des données (à adapter selon la structure réelle)
                 const vehicleJourney = data.vehicle_journeys?.[0];
                 
                 if (!vehicleJourney) {
@@ -236,25 +288,59 @@
                     return;
                 }
                 
-                // Nom de la ligne (à adapter selon la structure réelle)
-                const lineName = vehicleJourney.route?.line?.name || "Ligne inconnue";
+                // Nom de la ligne - utiliser headsign ou name
+                const lineName = vehicleJourney.headsign || vehicleJourney.name || "Ligne inconnue";
                 document.getElementById('line-name').textContent = lineName;
                 
-                // Numéro du train
+                // Numéro du train - utiliser name ou extraire de l'ID
                 const trainNumber = vehicleJourney.name || vehicleJourney.id?.split(':').pop() || "N/A";
                 document.getElementById('train-number').textContent = `Train ${trainNumber}`;
                 
-                // Destination (dernier arrêt)
-                const destination = vehicleJourney.journey_pattern?.route?.direction?.stop_area?.name || 
-                                  "Destination inconnue";
+                // Destination (dernier arrêt non sauté)
+                const stopTimes = vehicleJourney.stop_times || [];
+                let destination = "Destination inconnue";
+                
+                if (stopTimes.length > 0) {
+                    // Trouver le dernier arrêt non sauté
+                    for (let i = stopTimes.length - 1; i >= 0; i--) {
+                        if (!stopTimes[i].skipped_stop) {
+                            destination = stopTimes[i].stop_point?.name || "Destination inconnue";
+                            break;
+                        }
+                    }
+                }
+                
                 document.getElementById('destination-name').textContent = destination.toUpperCase();
                 
-                // Prochain arrêt (simulation - à adapter avec les données réelles)
-                document.getElementById('next-stop-name').textContent = "Gare de Lyon";
-                
-                // Statut de ponctualité (simulation - à adapter avec les données réelles)
-                document.getElementById('delay-status').textContent = "À l'heure";
-                document.getElementById('delay-status').className = "on-time";
+                // Prochain arrêt
+                if (stopTimes.length > 0) {
+                    const nextStopInfo = findNextStop(stopTimes);
+                    const nextStop = nextStopInfo.stop;
+                    
+                    if (nextStop && !nextStop.skipped_stop) {
+                        document.getElementById('next-stop-name').textContent = nextStop.stop_point?.name || "Arrêt inconnu";
+                        
+                        // Calculer si le train est en retard
+                        const now = new Date();
+                        const scheduledTime = parseTime(nextStop.departure_time || nextStop.arrival_time, now);
+                        
+                        if (scheduledTime) {
+                            const delayMinutes = Math.round((now - scheduledTime) / (1000 * 60));
+                            
+                            if (delayMinutes > 1) {
+                                document.getElementById('delay-status').textContent = `+${delayMinutes} min`;
+                                document.getElementById('delay-status').className = "delay";
+                            } else {
+                                document.getElementById('delay-status').textContent = "À l'heure";
+                                document.getElementById('delay-status').className = "on-time";
+                            }
+                        }
+                    } else {
+                        document.getElementById('next-stop-name').textContent = "Terminus";
+                    }
+                } else {
+                    document.getElementById('next-stop-name').textContent = "Aucun arrêt";
+                }
                 
             } catch (error) {
                 console.error("Erreur lors de l'analyse des données:", error);
