@@ -230,7 +230,7 @@
         }
         
         // Obtenir le nom de la ligne à partir des données de départ
-        async function getLineInfo(trainId, firstStopName) {
+        async function getLineInfo(trainId, firstStopName, trainHeadsign) {
             if (!firstStopName) return null;
             
             try {
@@ -268,15 +268,35 @@
                 const departuresData = await departuresResponse.json();
                 const departures = departuresData.departures || [];
                 
-                // Chercher notre train dans les départs
+                // Chercher notre train dans les départs par ID exact d'abord
                 for (const dep of departures) {
                     if (dep.vehicle_journey && dep.vehicle_journey.id === trainId) {
                         return {
-                            lineCode: dep.display_informations?.code || null,
-                            lineColor: dep.display_informations?.color ? "#" + dep.display_informations.color : "#0052a3",
-                            commercialMode: dep.display_informations?.commercial_mode || null
+                            lineCode: dep.display_informations?.code || dep.display_informations?.label || null,
+                            lineColor: dep.display_informations?.color ? "#" + dep.display_informations.color : "#0052a3"
                         };
                     }
+                }
+                
+                // Si pas trouvé par ID exact, chercher par headsign
+                if (trainHeadsign) {
+                    for (const dep of departures) {
+                        if (dep.display_informations?.headsign === trainHeadsign) {
+                            return {
+                                lineCode: dep.display_informations?.code || dep.display_informations?.label || null,
+                                lineColor: dep.display_informations?.color ? "#" + dep.display_informations.color : "#0052a3"
+                            };
+                        }
+                    }
+                }
+                
+                // Si toujours pas trouvé, prendre le premier départ disponible
+                if (departures.length > 0) {
+                    const dep = departures[0];
+                    return {
+                        lineCode: dep.display_informations?.code || dep.display_informations?.label || null,
+                        lineColor: dep.display_informations?.color ? "#" + dep.display_informations.color : "#0052a3"
+                    };
                 }
                 
                 return null;
@@ -324,6 +344,7 @@
                 }
                 
                 const stopTimes = vehicleJourney.stop_times || [];
+                const trainHeadsign = vehicleJourney.headsign;
                 
                 // Obtenir le nom de la ligne à partir du premier arrêt
                 let lineName = vehicleJourney.headsign || vehicleJourney.name || "Ligne inconnue";
@@ -331,7 +352,7 @@
                 
                 if (stopTimes.length > 0) {
                     const firstStopName = stopTimes[0].stop_point?.name;
-                    const lineInfo = await getLineInfo(trainId, firstStopName);
+                    const lineInfo = await getLineInfo(trainId, firstStopName, trainHeadsign);
                     
                     if (lineInfo && lineInfo.lineCode) {
                         lineName = lineInfo.lineCode;
