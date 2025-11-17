@@ -398,55 +398,64 @@
             return Math.max(1, Math.floor(availableHeight / stopItemHeight));
         }
         
-        // ФУНКЦИЯ: Получить реальный ID поезда через Worker
-        async function getRealTimeTrainId(baseTrainId) {
+        // ФУНКЦИЯ: Получить данные поезда через Worker
+        async function getTrainData(trainId) {
             try {
-                // Пробуем разные форматы ID для реального времени
-                const realTimeIds = [
-                    baseTrainId,
-                    `${baseTrainId}:RealTime`,
-                    baseTrainId.replace('vehicle_journey:', 'vehicle_journey:RealTime:'),
-                    // Для поиска по номеру поезда
-                    `train:${baseTrainId.split(':').pop()}`
-                ];
+                console.log("Fetching train data for ID:", trainId);
+                const response = await fetch(`https://api.dmytrothemir.workers.dev/?id=${trainId}`);
                 
-                let bestResult = null;
-                
-                for (const realTimeId of realTimeIds) {
-                    console.log("Trying ID:", realTimeId);
-                    const response = await fetch(`https://api.dmytrothemir.workers.dev/?id=${realTimeId}`);
-                    
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.vehicle_journeys && data.vehicle_journeys.length > 0) {
-                            console.log("Found data with ID:", realTimeId);
-                            
-                            const result = { 
-                                data, 
-                                realTimeId,
-                                isRealTime: realTimeId.includes('RealTime') || realTimeId.includes('train:')
-                            };
-                            
-                            // Если нашли реальное время, используем его
-                            if (result.isRealTime) {
-                                return result;
-                            }
-                            
-                            // Иначе сохраняем как запасной вариант
-                            if (!bestResult) {
-                                bestResult = result;
-                            }
-                        }
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.vehicle_journeys && data.vehicle_journeys.length > 0) {
+                        console.log("Found train data");
+                        
+                        // Определяем, реальные ли это данные
+                        const isRealTime = checkIfRealTimeData(data.vehicle_journeys[0]);
+                        
+                        return { 
+                            data, 
+                            isRealTime
+                        };
                     }
                 }
                 
-                // Возвращаем либо реальное время, либо базовое расписание
-                return bestResult || null;
+                return null;
                 
             } catch (error) {
-                console.error("Error finding train data:", error);
+                console.error("Error fetching train data:", error);
                 return null;
             }
+        }
+
+        // Проверить, являются ли данные реальными
+        function checkIfRealTimeData(vehicleJourney) {
+            // Проверяем различные признаки реального времени
+            if (!vehicleJourney) return false;
+            
+            // 1. Проверяем ID на наличие RealTime
+            if (vehicleJourney.id && vehicleJourney.id.includes('RealTime')) {
+                return true;
+            }
+            
+            // 2. Проверяем stop_times на наличие задержек
+            if (vehicleJourney.stop_times) {
+                for (const stop of vehicleJourney.stop_times) {
+                    // Проверяем статусы задержек
+                    if (stop.arrival_status === 'DELAYED' || stop.departure_status === 'DELAYED') {
+                        return true;
+                    }
+                    // Проверяем явные задержки
+                    if (stop.delay && stop.delay > 0) {
+                        return true;
+                    }
+                    // Проверяем дополнительные данные реального времени
+                    if (stop.data_freshness && stop.data_freshness === 'realtime') {
+                        return true;
+                    }
+                }
+            }
+            
+            return false;
         }
 
         // УЛУЧШЕННАЯ ФУНКЦИЯ: Анализировать задержки из данных vehicle_journey
@@ -462,18 +471,14 @@
                 const scheduledTime = parseTime(stop.departure_time || stop.arrival_time, now);
                 if (!scheduledTime) return;
                 
-                // Проверяем есть ли данные о реальном времени в stop
-                if (stop.arrival_status === 'DELAYED' || stop.departure_status === 'DELAYED') {
-                    // Если есть явная задержка в данных
-                    const baseTime = scheduledTime.getTime();
-                    const actualTime = new Date(baseTime + (stop.delay || 0) * 60 * 1000);
-                    const delayMinutes = Math.round((actualTime.getTime() - baseTime) / (1000 * 60));
-                    
-                    delays[stop.stop_point?.id] = Math.max(0, delayMinutes);
-                } else {
-                    // Иначе вычисляем задержку относительно текущего времени
+                // Используем явные задержки из данных если есть
+                if (stop.delay && stop.delay > 0) {
+                    delays[stop.stop_point?.id] = Math.max(0, stop.delay);
+                } 
+                // Или вычисляем задержку относительно текущего времени для прошедших остановок
+                else if (scheduledTime < now) {
                     const delayMinutes = Math.round((now - scheduledTime) / (1000 * 60));
-                    if (delayMinutes > 0 && scheduledTime > new Date(now.getTime() - 2 * 60 * 60 * 1000)) {
+                    if (delayMinutes > 0) {
                         delays[stop.stop_point?.id] = delayMinutes;
                     }
                 }
@@ -544,13 +549,13 @@
             
             try {
                 console.log("Loading train data for:", trainId);
-                const result = await getRealTimeTrainId(trainId);
+                const result = await getTrainData(trainId);
                 
                 if (!result) {
                     throw new Error("Impossible de charger les données du train");
                 }
                 
-                displayTrainData(result.data, result.realTimeId, result.isRealTime);
+                displayTrainData(result.data, trainId, result.isRealTime);
                 
             } catch (error) {
                 console.error("Erreur lors du chargement des données:", error);
@@ -709,7 +714,7 @@
                 
                 // Получаем задержку для этой остановки
                 const stopDelay = delays[stop.stop_point?.id] || 0;
-                const delayMinutes = stopDelay > 0 ? stopDelay : Math.max(0, Math.round((now - scheduledTime) / (1000 * 60)));
+                const delayMinutes = stopDelay;
                 
                 if (delayMinutes > 1) {
                     hasDelay = true;
