@@ -268,6 +268,15 @@
             font-weight: bold;
             border-bottom: 2px solid #ffcdd2;
         }
+
+        .realtime-indicator {
+            background: #e8f5e8;
+            color: #2e7d32;
+            padding: 8px 20px;
+            text-align: center;
+            font-size: 24px;
+            border-bottom: 2px solid #c8e6c9;
+        }
     </style>
 </head>
 <body>
@@ -279,6 +288,10 @@
             </div>
             <div class="destination" id="destination-name">...</div>
             <div class="current-time" id="current-time">--:--:--</div>
+        </div>
+        
+        <div id="realtime-indicator" class="realtime-indicator" style="display: none;">
+            ✅ Données temps réel
         </div>
         
         <div id="delay-header" class="header-delay" style="display: none;"></div>
@@ -371,17 +384,21 @@
             const header = document.querySelector('.header');
             const footer = document.querySelector('.footer');
             const delayHeader = document.getElementById('delay-header');
+            const realtimeIndicator = document.getElementById('realtime-indicator');
             
             let availableHeight = window.innerHeight - header.offsetHeight - footer.offsetHeight;
             if (delayHeader.style.display !== 'none') {
                 availableHeight -= delayHeader.offsetHeight;
+            }
+            if (realtimeIndicator.style.display !== 'none') {
+                availableHeight -= realtimeIndicator.offsetHeight;
             }
             
             const stopItemHeight = 100;
             return Math.max(1, Math.floor(availableHeight / stopItemHeight));
         }
         
-        // НОВАЯ ФУНКЦИЯ: Получить реальный ID поезда
+        // ФУНКЦИЯ: Получить реальный ID поезда через Worker
         async function getRealTimeTrainId(baseTrainId) {
             try {
                 // Пробуем разные форматы ID для реального времени
@@ -389,118 +406,99 @@
                     baseTrainId,
                     `${baseTrainId}:RealTime`,
                     baseTrainId.replace('vehicle_journey:', 'vehicle_journey:RealTime:'),
-                    // Для формата vehicle_journey:SNCF:2025-11-17:9830:1187:LongDistanceTrain
-                    // Пробуем добавить RealTime код в конец
-                    `${baseTrainId}:RealTime:${Math.floor(Math.random() * 1000)}` // случайный код
+                    // Для поиска по номеру поезда
+                    `train:${baseTrainId.split(':').pop()}`
                 ];
                 
+                let bestResult = null;
+                
                 for (const realTimeId of realTimeIds) {
-                    console.log("Trying realtime ID:", realTimeId);
+                    console.log("Trying ID:", realTimeId);
                     const response = await fetch(`https://api.dmytrothemir.workers.dev/?id=${encodeURIComponent(realTimeId)}`);
                     
                     if (response.ok) {
                         const data = await response.json();
                         if (data.vehicle_journeys && data.vehicle_journeys.length > 0) {
-                            console.log("Found realtime data with ID:", realTimeId);
-                            return { 
+                            console.log("Found data with ID:", realTimeId);
+                            
+                            const result = { 
                                 data, 
                                 realTimeId,
-                                isRealTime: realTimeId !== baseTrainId
+                                isRealTime: realTimeId.includes('RealTime') || realTimeId.includes('train:')
                             };
+                            
+                            // Если нашли реальное время, используем его
+                            if (result.isRealTime) {
+                                return result;
+                            }
+                            
+                            // Иначе сохраняем как запасной вариант
+                            if (!bestResult) {
+                                bestResult = result;
+                            }
                         }
                     }
                 }
                 
-                // Если реальное время не найдено, используем базовые данные
-                console.log("No realtime data found, using base schedule");
-                const baseResponse = await fetch(`https://api.dmytrothemir.workers.dev/?id=${encodeURIComponent(baseTrainId)}`);
-                if (baseResponse.ok) {
-                    return { 
-                        data: await baseResponse.json(), 
-                        realTimeId: baseTrainId,
-                        isRealTime: false 
-                    };
-                }
+                // Возвращаем либо реальное время, либо базовое расписание
+                return bestResult || null;
                 
-                return null;
             } catch (error) {
-                console.error("Error finding realtime data:", error);
+                console.error("Error finding train data:", error);
                 return null;
             }
         }
 
-        // УЛУЧШЕННАЯ ФУНКЦИЯ: Получить реальные данные о задержках
-        async function getRealTimeDelay(trainId) {
-            try {
-                // Используем endpoint vehicles для получения реального времени
-                const vehiclesUrl = `https://api.sncf.com/v1/coverage/sncf/vehicles?headsign=${encodeURIComponent(trainId.split(':').pop())}&count=10`;
+        // УЛУЧШЕННАЯ ФУНКЦИЯ: Анализировать задержки из данных vehicle_journey
+        function analyzeDelays(vehicleJourney) {
+            const delays = {};
+            const now = new Date();
+            
+            if (!vehicleJourney.stop_times) return delays;
+            
+            vehicleJourney.stop_times.forEach(stop => {
+                if (stop.skipped_stop) return;
                 
-                const response = await fetch(vehiclesUrl, {
-                    headers: { Authorization: "Basic " + btoa(API_KEY + ":") }
-                });
+                const scheduledTime = parseTime(stop.departure_time || stop.arrival_time, now);
+                if (!scheduledTime) return;
                 
-                if (response.ok) {
-                    const data = await response.json();
-                    // Ищем наш поезд по ID или headsign
-                    for (const vehicle of data.vehicles || []) {
-                        if (vehicle.id && vehicle.id.includes(trainId.split(':').pop())) {
-                            return vehicle;
-                        }
+                // Проверяем есть ли данные о реальном времени в stop
+                if (stop.arrival_status === 'DELAYED' || stop.departure_status === 'DELAYED') {
+                    // Если есть явная задержка в данных
+                    const baseTime = scheduledTime.getTime();
+                    const actualTime = new Date(baseTime + (stop.delay || 0) * 60 * 1000);
+                    const delayMinutes = Math.round((actualTime.getTime() - baseTime) / (1000 * 60));
+                    
+                    delays[stop.stop_point?.id] = Math.max(0, delayMinutes);
+                } else {
+                    // Иначе вычисляем задержку относительно текущего времени
+                    const delayMinutes = Math.round((now - scheduledTime) / (1000 * 60));
+                    if (delayMinutes > 0 && scheduledTime > new Date(now.getTime() - 2 * 60 * 60 * 1000)) {
+                        delays[stop.stop_point?.id] = delayMinutes;
                     }
                 }
-                return null;
-            } catch (error) {
-                console.error("Error getting realtime delay:", error);
-                return null;
-            }
+            });
+            
+            return delays;
         }
         
-        // Obtenir le nom de la ligne
+        // Obtenir le nom de la ligne через Worker
         async function getLineInfo(trainId, firstStopName, trainHeadsign) {
             if (!firstStopName) return null;
             
             try {
-                const now = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Paris" })
-                    .replace(/[-:T ]/g, "")
-                    .slice(0, 14);
+                // Используем Worker для поиска информации о линии
+                const searchUrl = `https://api.dmytrothemir.workers.dev/?search=${encodeURIComponent(firstStopName)}`;
                 
-                const searchUrl = `https://api.sncf.com/v1/coverage/sncf/places?q=${encodeURIComponent(firstStopName)}&type[]=stop_area&count=10`;
-                
-                const searchResponse = await fetch(searchUrl, {
-                    headers: { Authorization: "Basic " + btoa(API_KEY + ":") }
-                });
+                const searchResponse = await fetch(searchUrl);
                 
                 if (!searchResponse.ok) return null;
                 
                 const searchData = await searchResponse.json();
-                const places = searchData.places || [];
                 
-                if (places.length === 0) return null;
-                
-                const stopAreaId = places[0].id;
-                const departuresUrl = `https://api.sncf.com/v1/coverage/sncf/stop_areas/${stopAreaId}/departures?datetime=${now}&count=50`;
-                
-                const departuresResponse = await fetch(departuresUrl, {
-                    headers: { Authorization: "Basic " + btoa(API_KEY + ":") }
-                });
-                
-                if (!departuresResponse.ok) return null;
-                
-                const departuresData = await departuresResponse.json();
-                const departures = departuresData.departures || [];
-                
-                for (const dep of departures) {
-                    if (dep.vehicle_journey && dep.vehicle_journey.id === trainId) {
-                        return {
-                            lineCode: dep.display_informations?.code || dep.display_informations?.label || null,
-                            lineColor: dep.display_informations?.color ? "#" + dep.display_informations.color : "#0052a3",
-                            commercialMode: dep.display_informations?.commercial_mode || null
-                        };
-                    }
-                }
-                
-                if (trainHeadsign) {
-                    for (const dep of departures) {
+                // Ищем подходящий поезд по headsign
+                if (searchData.departures) {
+                    for (const dep of searchData.departures) {
                         if (dep.display_informations?.headsign === trainHeadsign) {
                             return {
                                 lineCode: dep.display_informations?.code || dep.display_informations?.label || null,
@@ -509,15 +507,16 @@
                             };
                         }
                     }
-                }
-                
-                if (departures.length > 0) {
-                    const dep = departures[0];
-                    return {
-                        lineCode: dep.display_informations?.code || dep.display_informations?.label || null,
-                        lineColor: dep.display_informations?.color ? "#" + dep.display_informations.color : "#0052a3",
-                        commercialMode: dep.display_informations?.commercial_mode || null
-                    };
+                    
+                    // Если не нашли по headsign, берем первый подходящий
+                    if (searchData.departures.length > 0) {
+                        const dep = searchData.departures[0];
+                        return {
+                            lineCode: dep.display_informations?.code || dep.display_informations?.label || null,
+                            lineColor: dep.display_informations?.color ? "#" + dep.display_informations.color : "#0052a3",
+                            commercialMode: dep.display_informations?.commercial_mode || null
+                        };
+                    }
                 }
                 
                 return null;
@@ -551,10 +550,7 @@
                     throw new Error("Impossible de charger les données du train");
                 }
                 
-                // Получаем реальные данные о задержках
-                const realTimeDelay = await getRealTimeDelay(trainId);
-                
-                displayTrainData(result.data, result.realTimeId, result.isRealTime, realTimeDelay);
+                displayTrainData(result.data, result.realTimeId, result.isRealTime);
                 
             } catch (error) {
                 console.error("Erreur lors du chargement des données:", error);
@@ -563,7 +559,7 @@
         }
         
         // Afficher les données du train
-        async function displayTrainData(data, trainId, isRealTime, realTimeDelay) {
+        async function displayTrainData(data, trainId, isRealTime) {
             document.getElementById('loading').style.display = 'none';
             
             try {
@@ -574,8 +570,24 @@
                     return;
                 }
                 
+                // Показываем индикатор реального времени
+                const realtimeIndicator = document.getElementById('realtime-indicator');
+                if (isRealTime) {
+                    realtimeIndicator.style.display = 'block';
+                    realtimeIndicator.textContent = '✅ Données temps réel';
+                } else {
+                    realtimeIndicator.style.display = 'block';
+                    realtimeIndicator.textContent = '⚠️ Données théoriques (hors temps réel)';
+                    realtimeIndicator.style.background = '#fff3e0';
+                    realtimeIndicator.style.color = '#ef6c00';
+                    realtimeIndicator.style.borderBottom = '2px solid #ffcc80';
+                }
+                
                 const stopTimes = vehicleJourney.stop_times || [];
                 const trainHeadsign = vehicleJourney.headsign;
+                
+                // Анализируем задержки
+                const delays = analyzeDelays(vehicleJourney);
                 
                 // Obtenir le nom de la ligne
                 let lineName = vehicleJourney.headsign || vehicleJourney.name || "?";
@@ -612,7 +624,7 @@
                 document.getElementById('destination-name').textContent = destination;
                 
                 // Afficher les arrêts avec les données réelles
-                displayStops(stopTimes, lineColor, trainId, isRealTime, realTimeDelay);
+                displayStops(stopTimes, lineColor, delays, isRealTime);
                 
             } catch (error) {
                 console.error("Erreur lors de l'analyse des données:", error);
@@ -621,7 +633,7 @@
         }
         
         // Afficher les arrêts avec gestion des retards
-        async function displayStops(stopTimes, lineColor, trainId, isRealTime, realTimeDelay) {
+        async function displayStops(stopTimes, lineColor, delays, isRealTime) {
             const stopsList = document.getElementById('stops-list');
             const moreIndicator = document.getElementById('more-indicator');
             const noMoreIndicator = document.getElementById('no-more-indicator');
@@ -671,9 +683,6 @@
             let maxDelay = 0;
             let hasDelay = false;
             
-            // Получаем реальную задержку из данных vehicles
-            const realDelay = realTimeDelay?.delay || 0;
-            
             stopsToShow.forEach((stop, index) => {
                 if (stop.skipped_stop) return;
                 
@@ -698,13 +707,11 @@
                 const now = new Date();
                 const scheduledTime = parseTime(stop.departure_time || stop.arrival_time, now);
                 
-                // Используем реальную задержку если есть, иначе вычисляем
-                let delayMinutes = realDelay;
-                if (delayMinutes === 0 && scheduledTime) {
-                    delayMinutes = Math.max(0, Math.round((now - scheduledTime) / (1000 * 60)));
-                }
+                // Получаем задержку для этой остановки
+                const stopDelay = delays[stop.stop_point?.id] || 0;
+                const delayMinutes = stopDelay > 0 ? stopDelay : Math.max(0, Math.round((now - scheduledTime) / (1000 * 60)));
                 
-                if (delayMinutes > 0) {
+                if (delayMinutes > 1) {
                     hasDelay = true;
                     maxDelay = Math.max(maxDelay, delayMinutes);
                     
@@ -731,7 +738,7 @@
                     // Pas de retard
                     stopTimeInfo.textContent = formatTime(scheduledTime);
                     
-                    if (index === 0) {
+                    if (index === 0 && isRealTime) {
                         const onTimeSpan = document.createElement('span');
                         onTimeSpan.className = 'stop-on-time';
                         onTimeSpan.textContent = `À l'heure`;
@@ -773,6 +780,7 @@
             document.getElementById('error').style.display = 'block';
             document.getElementById('error').textContent = message;
             document.getElementById('delay-header').style.display = 'none';
+            document.getElementById('realtime-indicator').style.display = 'none';
         }
         
         // Charger les données au démarrage
