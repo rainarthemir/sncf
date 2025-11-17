@@ -414,7 +414,7 @@
                 
                 for (const realTimeId of realTimeIds) {
                     console.log("Trying ID:", realTimeId);
-                    const response = await fetch(`https://api.dmytrothemir.workers.dev/?id=${encodeURIComponent(realTimeId)}`);
+                    const response = await fetch(`https://api.dmytrothemir.workers.dev/?id=${realTimeId}`);
                     
                     if (response.ok) {
                         const data = await response.json();
@@ -488,7 +488,7 @@
             
             try {
                 // Используем Worker для поиска информации о линии
-                const searchUrl = `https://api.dmytrothemir.workers.dev/?search=${encodeURIComponent(firstStopName)}`;
+                const searchUrl = `https://api.dmytrothemir.workers.dev/?search=${firstStopName}`;
                 
                 const searchResponse = await fetch(searchUrl);
                 
