@@ -468,7 +468,36 @@
                 showError("Impossible de charger les données du train. Vérifiez l'ID.");
             }
         }
+
+        // Новая функция для получения реальных задержек
+async function getRealTimeData(trainId) {
+    try {
+        // Использовать endpoint для реального времени
+        const now = new Date().toISOString().replace(/[-:]/g, "").split(".")[0];
+        const url = `https://api.sncf.com/v1/coverage/sncf/vehicle_journeys/${encodeURIComponent(trainId)}/departures?from_datetime=${now}&count=10`;
         
+        const response = await fetch(url, {
+            headers: { Authorization: "Basic " + btoa(API_KEY + ":") }
+        });
+        
+        if (response.ok) {
+            return await response.json();
+        }
+        return null;
+    } catch (error) {
+        console.error("Erreur données temps réel:", error);
+        return null;
+    }
+}
+// Обновленная функция displayStops с реальным временем
+async function displayStops(stopTimes, lineColor, trainId) {
+    // Получить реальные данные
+    const realTimeData = await getRealTimeData(trainId);
+    const realTimeStops = realTimeData?.departures?.[0]?.stop_times || [];
+
+    
+    // ... остальной код остается прежним, но с использованием realTimeStops для задержек
+}
         // Afficher les données du train
         async function displayTrainData(data, trainId) {
             document.getElementById('loading').style.display = 'none';
