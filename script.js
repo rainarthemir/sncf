@@ -1,8 +1,9 @@
 // ===== КОНФИГУРАЦИЯ =====
 const API_KEY = "e41a2be9-7450-4f1a-a7e6-eb429950186f";
-const WORKER_URL = "https://sncf-ter-ping.dmytrothemir.workers.dev/";
-const PUBLIC_PROXY_1 = "https://corsproxy.io/?";
-const PUBLIC_PROXY_2 = "https://api.allorigins.win/raw?url=";
+const WORKER_URL = "https://sncf-ter-ping.dmytrothemir.workers.dev/"; // Замените на свой
+
+const TER_BUILD_ID = "LjbgjtFQUzPTlTXVfIXVx";
+const TER_REGION = "hauts-de-france";
 
 // DOM элементы
 const stationInput = document.getElementById("stationSearch");
@@ -11,11 +12,6 @@ const boardBody = document.getElementById("board-body");
 const trainTypeSelect = document.getElementById("trainType");
 const refreshBtn = document.getElementById("refreshBtn");
 
-// Конфигурация TER Next.js API
-let TER_BUILD_ID = "LjbgjtFQUzPTlTXVfIXVx";
-const TER_REGION = "hauts-de-france";
-
-// Переменные состояния
 let currentStation = null;
 let currentStationName = '';
 let lastDepartures = [];
@@ -29,15 +25,6 @@ function escapeHtml(s = "") {
     '"': "&quot;",
     "'": "&#39;"
   }[c]));
-}
-
-function norm(str) {
-  return str
-    ?.normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toUpperCase() || "";
 }
 
 function formatTimeFromNavitia(ts) {
@@ -58,6 +45,15 @@ function formatTimeFromNavitia(ts) {
     }
   }
   return "—";
+}
+
+function norm(str) {
+  return str
+    ?.normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase() || "";
 }
 
 function getSlug(name) {
@@ -93,134 +89,88 @@ async function searchStations(q) {
   }
 }
 
-// ===================== ОБРАБОТКА ДАННЫХ TER =====================
-function processTERData(json) {
-  const data = json.pageProps?.data;
-  if (!data || !data.circulations) {
-    throw new Error('Invalid TER data structure');
-  }
-
-  return data.circulations.map(circ => {
-    const line = circ.line || {};
-    const dest = line.destination || {};
-    const events = circ.events || [];
-    
-    let status = 'on time';
-    let isCancelled = false;
-    let delayMinutes = 0;
-    let realDeparture = circ.departureDate;
-    
-    events.forEach(ev => {
-      if (ev.name === 'Deletion') {
-        isCancelled = true;
-        status = 'cancelled';
-      }
-      if (ev.name === 'Delay') {
-        delayMinutes = ev.duration || 0;
-        if (ev.departureDateIncident) {
-          realDeparture = ev.departureDateIncident;
-        }
-      }
-    });
-
-    if (delayMinutes > 0 && !isCancelled) {
-      status = 'delayed';
-    }
-
-    return {
-      display_informations: {
-        commercial_mode: 'TER',
-        headsign: `TER ${line.number || ''}`,
-        code: line.number || '',
-        direction: dest.name || '',
-        color: line.textBackground || '#0052a3',
-        status: status,
-      },
-      stop_date_time: {
-        base_departure_date_time: circ.departureDate,
-        departure_date_time: realDeparture,
-        departure_delay: delayMinutes * 60,
-      },
-      track: circ.track || null,
-      vehicle_journey: { id: line.number ? `TER-${line.number}` : null }
-    };
-  });
-}
-
-// ===================== TER API с несколькими прокси =====================
+// ===================== TER API ЧЕРЕЗ CLOUDFLARE WORKER =====================
 async function fetchDeparturesTER(stopId, stationName) {
   const uic = extractUIC(stopId);
   const slug = getSlug(stationName);
   
-  // Формируем целевой URL TER
   const targetUrl = `https://www.ter.sncf.com/_next/data/${TER_BUILD_ID}/${TER_REGION}/se-deplacer/prochains-departs/${slug}-${uic}.json?region=${TER_REGION}&uicCode=${slug}-${uic}`;
-  
-  // 1. Пытаемся через Cloudflare Worker
+  const proxyUrl = `${WORKER_URL}?url=${encodeURIComponent(targetUrl)}`;
+
   try {
-    const proxyUrl = `${WORKER_URL}?url=${encodeURIComponent(targetUrl)}`;
-    console.log('Попытка через Cloudflare Worker:', proxyUrl);
+    console.log('Запрос к Worker:', proxyUrl);
     const res = await fetch(proxyUrl);
     
-    if (res.ok) {
-      const json = await res.json();
-      return processTERData(json);
-    } else if (res.status === 403) {
-      console.warn('Cloudflare Worker вернул 403, пробуем публичный прокси');
-    } else {
-      console.warn(`Cloudflare Worker ошибка: ${res.status}`);
+    if (!res.ok) {
+      let errorMsg = `Worker error: ${res.status}`;
+      try {
+        const err = await res.json();
+        errorMsg = err.error || err.message || errorMsg;
+      } catch (e) {}
+      throw new Error(errorMsg);
     }
-  } catch (err) {
-    console.warn('Cloudflare Worker недоступен:', err.message);
-  }
 
-  // 2. Пытаемся через публичный CORS-прокси (corsproxy.io)
-  try {
-    const proxyUrl = `${PUBLIC_PROXY_1}${encodeURIComponent(targetUrl)}`;
-    console.log('Попытка через corsproxy.io');
-    const res = await fetch(proxyUrl, {
-      headers: { 'Origin': 'https://www.ter.sncf.com' }
-    });
-    
-    if (res.ok) {
-      const json = await res.json();
-      return processTERData(json);
-    } else {
-      console.warn(`corsproxy.io ошибка: ${res.status}`);
+    const json = await res.json();
+    const data = json.pageProps?.data;
+    if (!data || !data.circulations) {
+      throw new Error('Invalid TER data');
     }
-  } catch (err) {
-    console.warn('corsproxy.io недоступен:', err.message);
-  }
 
-  // 3. Пытаемся через allorigins.win
-  try {
-    const proxyUrl = `${PUBLIC_PROXY_2}${encodeURIComponent(targetUrl)}`;
-    console.log('Попытка через allorigins.win');
-    const res = await fetch(proxyUrl);
-    
-    if (res.ok) {
-      const json = await res.json();
-      // allorigins.win возвращает данные в поле 'contents'
-      if (json.contents) {
-        const parsed = JSON.parse(json.contents);
-        return processTERData(parsed);
+    return data.circulations.map(circ => {
+      const line = circ.line || {};
+      const dest = line.destination || {};
+      const events = circ.events || [];
+      
+      let status = 'on time';
+      let isCancelled = false;
+      let delayMinutes = 0;
+      let realDeparture = circ.departureDate;
+      
+      events.forEach(ev => {
+        if (ev.name === 'Deletion') {
+          isCancelled = true;
+          status = 'cancelled';
+        }
+        if (ev.name === 'Delay') {
+          delayMinutes = ev.duration || 0;
+          if (ev.departureDateIncident) {
+            realDeparture = ev.departureDateIncident;
+          }
+        }
+      });
+
+      if (delayMinutes > 0 && !isCancelled) {
+        status = 'delayed';
       }
-      return processTERData(json);
-    } else {
-      console.warn(`allorigins.win ошибка: ${res.status}`);
-    }
-  } catch (err) {
-    console.warn('allorigins.win недоступен:', err.message);
-  }
 
-  // Если все прокси не сработали
-  console.warn('Все прокси TER не сработали');
-  return null;
+      return {
+        display_informations: {
+          commercial_mode: 'TER',
+          headsign: `TER ${line.number || ''}`,
+          code: line.number || '',
+          direction: dest.name || '',
+          color: line.textBackground || '#0052a3',
+          status: status,
+        },
+        stop_date_time: {
+          base_departure_date_time: circ.departureDate,
+          departure_date_time: realDeparture,
+          departure_delay: delayMinutes * 60,
+        },
+        track: circ.track || null,  // Номер платформы!
+        vehicle_journey: { id: line.number ? `TER-${line.number}` : null }
+      };
+    });
+
+  } catch (err) {
+    console.warn('TER через Worker не удался:', err.message);
+    return null;
+  }
 }
 
-// ===================== NAVITIA (резервный источник) =====================
+// ===================== NAVITIA (резерв) =====================
 async function fetchDeparturesNavitia(stopId) {
   if (!stopId) return null;
-  
   const now = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Paris" })
     .replace(/[-:T ]/g, "")
     .slice(0, 14);
@@ -231,44 +181,36 @@ async function fetchDeparturesNavitia(stopId) {
     const res = await fetch(url, {
       headers: { Authorization: "Basic " + btoa(API_KEY + ":") }
     });
-    
     if (!res.ok) throw new Error(`Navitia error: ${res.status}`);
     const json = await res.json();
     return json.departures || null;
-    
   } catch (err) {
     console.error('Navitia fetch failed:', err);
     throw err;
   }
 }
 
-// ===================== ОСНОВНАЯ ФУНКЦИЯ ЗАГРУЗКИ =====================
+// ===================== ОСНОВНАЯ ЗАГРУЗКА =====================
 async function fetchDepartures(stopId, stationName) {
   if (!stopId) return;
-  
-  boardBody.innerHTML = `<div class="loading">Chargement des départs...</div>`;
-  
+  boardBody.innerHTML = `<div class="loading">Chargement...</div>`;
+
   try {
-    // Сначала пытаемся TER (с прокси)
     let departures = await fetchDeparturesTER(stopId, stationName);
-    
-    // Если TER не сработал, используем Navitia
     if (!departures) {
-      console.log('Переключение на Navitia API');
+      console.log('Переключение на Navitia');
       departures = await fetchDeparturesNavitia(stopId);
     }
-    
+
     if (!departures || departures.length === 0) {
-      boardBody.innerHTML = `<div class="no-data">Aucun départ trouvé pour cette gare</div>`;
+      boardBody.innerHTML = `<div class="no-data">Aucun départ trouvé</div>`;
       return;
     }
-    
+
     lastDepartures = departures;
     renderBoard(lastDepartures);
-    
   } catch (err) {
-    console.error('Ошибка загрузки:', err);
-    boardBody.innerHTML = `<div class="no-data">Erreur de connexion: ${err.message}</div>`;
+    boardBody.innerHTML = `<div class="no-data">Erreur: ${err.message}</div>`;
   }
 }
 
@@ -276,11 +218,6 @@ async function fetchDepartures(stopId, stationName) {
 function renderBoard(departures) {
   const typeFilter = trainTypeSelect.value;
   const isMobile = window.innerWidth < 768;
-
-  if (!departures.length) {
-    boardBody.innerHTML = `<div class="no-data">Aucun départ trouvé</div>`;
-    return;
-  }
 
   const filtered = departures.filter(dep => {
     if (typeFilter === "all") return true;
@@ -335,6 +272,7 @@ function renderBoard(departures) {
       timeCell = `<span class="on-time">${displayedTime}</span>`;
     }
 
+    // Получаем номер платформы (если есть)
     const platform = dep.track || '—';
 
     // ===== ЛОГОТИПЫ =====
