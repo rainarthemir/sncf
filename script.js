@@ -5,7 +5,12 @@ const boardBody = document.getElementById("board-body");
 const trainTypeSelect = document.getElementById("trainType");
 const refreshBtn = document.getElementById("refreshBtn");
 
+// Конфигурация TER API (buildId может меняться, при необходимости обновите)
+const TER_BUILD_ID = "LjbgjtFQUzPTlTXVfIXVx";
+const TER_REGION = "hauts-de-france";
+
 let currentStation = null;
+let currentStationName = '';
 let lastDepartures = [];
 
 // ===================== UTILS =====================
@@ -19,7 +24,6 @@ function escapeHtml(s = "") {
   }[c]));
 }
 
-// Нормализация текста: убирает акценты, лишние пробелы и приводит к верхнему регистру
 function norm(str) {
   return str
     ?.normalize("NFD")
@@ -31,20 +35,42 @@ function norm(str) {
 
 function formatTimeFromNavitia(ts) {
   if (!ts) return "—";
-  
-  // Формат: "20251110T183100" -> "18h31"
-  // Простая проверка - если есть 'T' и длина достаточная
   if (ts.includes('T') && ts.length >= 13) {
     const timePart = ts.split('T')[1];
     if (timePart && timePart.length >= 4) {
-      return timePart.substring(0, 2) + "h" + timePart.substring(2, 4);
+      // Обрабатываем как "HH:MM:SS±hh:mm" или "HHMMSS"
+      let hh, mm;
+      if (timePart.includes(':')) {
+        const parts = timePart.split(':');
+        hh = parts[0];
+        mm = parts[1];
+      } else {
+        hh = timePart.substring(0, 2);
+        mm = timePart.substring(2, 4);
+      }
+      return hh + "h" + mm;
     }
   }
-  
   return "—";
 }
 
-// ===================== SEARCH =====================
+// Преобразование названия станции в slug для TER API
+function getSlug(name) {
+  return name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+// Извлечение UIC‑кода из идентификатора Navitia
+function extractUIC(stopId) {
+  const parts = stopId.split(':');
+  return parts[parts.length - 1];
+}
+
+// ===================== ПОИСК СТАНЦИЙ (Navitia) =====================
 async function searchStations(q) {
   if (!q || q.trim().length < 2) return [];
   const url = `https://api.sncf.com/v1/coverage/sncf/places?q=${encodeURIComponent(q)}&type[]=stop_area&count=50`;
@@ -61,9 +87,78 @@ async function searchStations(q) {
   }
 }
 
-// ===================== FETCH =====================
-async function fetchDepartures(stopId) {
-  if (!stopId) return;
+// ===================== ПОЛУЧЕНИЕ ДАННЫХ ЧЕРЕЗ TER API =====================
+async function fetchDeparturesTER(stopId, stationName) {
+  const uic = extractUIC(stopId);
+  const slug = getSlug(stationName);
+  const url = `https://www.ter.sncf.com/_next/data/${TER_BUILD_ID}/${TER_REGION}/se-deplacer/prochains-departs/${slug}-${uic}.json?region=${TER_REGION}&uicCode=${slug}-${uic}`;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`TER API error: ${res.status}`);
+    const json = await res.json();
+    const data = json.pageProps?.data;
+    if (!data || !data.circulations) throw new Error('Invalid TER data structure');
+
+    // Преобразуем circulations в формат, совместимый с renderBoard
+    const departures = data.circulations.map(circ => {
+      const line = circ.line || {};
+      const dest = line.destination || {};
+      const events = circ.events || [];
+      
+      // Определяем статус
+      let status = 'on time';
+      let isCancelled = false;
+      let delayMinutes = 0;
+      let realDeparture = circ.departureDate;
+      
+      events.forEach(ev => {
+        if (ev.name === 'Deletion') {
+          isCancelled = true;
+          status = 'cancelled';
+        }
+        if (ev.name === 'Delay') {
+          delayMinutes = ev.duration || 0;
+          if (ev.departureDateIncident) {
+            realDeparture = ev.departureDateIncident;
+          }
+        }
+      });
+
+      // Если есть задержка, но не отменён
+      if (delayMinutes > 0 && !isCancelled) {
+        status = 'delayed';
+      }
+
+      return {
+        display_informations: {
+          commercial_mode: 'TER',
+          headsign: `TER ${line.number || ''}`,
+          code: line.number || '',
+          direction: dest.name || '',
+          color: line.textBackground || '#0052a3',
+          status: status,
+        },
+        stop_date_time: {
+          base_departure_date_time: circ.departureDate,
+          departure_date_time: realDeparture,
+          departure_delay: delayMinutes * 60, // в секундах для совместимости
+        },
+        // Для кликабельности используем line.number (можно расширить при необходимости)
+        vehicle_journey: { id: line.number ? `TER-${line.number}` : null }
+      };
+    });
+
+    return departures;
+  } catch (err) {
+    console.warn('TER API failed, falling back to Navitia:', err);
+    return null;
+  }
+}
+
+// ===================== ПОЛУЧЕНИЕ ДАННЫХ ЧЕРЕЗ NAVITIA (старый метод) =====================
+async function fetchDeparturesNavitia(stopId) {
+  if (!stopId) return null;
   const now = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Paris" })
     .replace(/[-:T ]/g, "")
     .slice(0, 14);
@@ -74,19 +169,30 @@ async function fetchDepartures(stopId) {
     const res = await fetch(url, {
       headers: { Authorization: "Basic " + btoa(API_KEY + ":") }
     });
-
-    if (!res.ok) {
-      boardBody.innerHTML = `<div class="no-data">Erreur API: ${res.status}</div>`;
-      return;
-    }
-
+    if (!res.ok) throw new Error(`Navitia error: ${res.status}`);
     const json = await res.json();
-    if (!json.departures) {
+    return json.departures || null;
+  } catch (err) {
+    console.error('Navitia fetch failed:', err);
+    throw err;
+  }
+}
+
+// ===================== ОСНОВНАЯ ФУНКЦИЯ ЗАГРУЗКИ =====================
+async function fetchDepartures(stopId, stationName) {
+  if (!stopId) return;
+  try {
+    // Сначала пробуем TER API
+    let departures = await fetchDeparturesTER(stopId, stationName);
+    if (!departures) {
+      // Если TER не удался, используем Navitia
+      departures = await fetchDeparturesNavitia(stopId);
+    }
+    if (!departures || departures.length === 0) {
       boardBody.innerHTML = `<div class="no-data">Aucun départ trouvé</div>`;
       return;
     }
-
-    lastDepartures = json.departures || [];
+    lastDepartures = departures;
     renderBoard(lastDepartures);
   } catch (err) {
     boardBody.innerHTML = `<div class="no-data">Erreur de connexion<br>${err.message}</div>`;
@@ -136,19 +242,16 @@ function renderBoard(departures) {
     const color = info.color ? ("#" + info.color) : "#0052a3";
     const canceled = info.status && info.status.toLowerCase().includes("cancelled");
 
-    // ИСПРАВЛЕННАЯ ЛОГИКА ВРЕМЕНИ И ЗАДЕРЖЕК
-    const baseTs = st.base_departure_date_time; // Теоретическое время
-    const realTs = st.departure_date_time; // Практическое время с задержками
-    const delayM = Math.floor((st.departure_delay || 0) / 60); // Задержка в минутах
+    const baseTs = st.base_departure_date_time;
+    const realTs = st.departure_date_time;
+    const delayM = Math.floor((st.departure_delay || 0) / 60);
 
-    // ВСЕГДА используем реальное время для отображения
     const displayedTime = formatTimeFromNavitia(realTs || baseTs);
 
     let timeCell;
     if (canceled) {
       timeCell = `<span class="canceled-time">${displayedTime}</span>`;
     } else if (delayM > 0) {
-      // Показываем реальное время + индикатор задержки
       timeCell = `
         <div class="time-with-delay">
           <span class="delayed-time">${displayedTime}</span>
@@ -159,7 +262,7 @@ function renderBoard(departures) {
       timeCell = `<span class="on-time">${displayedTime}</span>`;
     }
 
-    // ===================== ЛОГОТИПЫ =====================
+    // Логотипы (без изменений)
     function getTrainLogo(info) {
       let logoHtml = "";
       let textHtml = "";
@@ -265,7 +368,6 @@ function renderBoard(departures) {
     `;
   }).join("");
 
-  // Добавляем кликабельность для поездов
   document.querySelectorAll('.clickable-train-row').forEach(row => {
     const clone = row.cloneNode(true);
     row.parentNode.replaceChild(clone, row);
@@ -285,7 +387,7 @@ stationInput.addEventListener("input", async e => {
   }
   const results = await searchStations(val);
   suggestionsBox.innerHTML = results.length
-    ? results.map(r => `<div class="suggestion-item" data-id="${r.id}">${r.label}</div>`).join("")
+    ? results.map(r => `<div class="suggestion-item" data-id="${r.id}" data-label="${r.label}">${r.label}</div>`).join("")
     : '<div class="suggestion-empty">Aucun résultat</div>';
   suggestionsBox.style.display = "block";
 });
@@ -294,13 +396,16 @@ suggestionsBox.addEventListener("click", e => {
   const item = e.target.closest(".suggestion-item");
   if (!item) return;
   currentStation = item.dataset.id;
-  stationInput.value = item.textContent;
+  currentStationName = item.dataset.label;
+  stationInput.value = currentStationName;
   suggestionsBox.style.display = "none";
-  fetchDepartures(currentStation);
+  fetchDepartures(currentStation, currentStationName);
 });
 
 refreshBtn.addEventListener("click", () => {
-  if (currentStation) fetchDepartures(currentStation);
+  if (currentStation && currentStationName) {
+    fetchDepartures(currentStation, currentStationName);
+  }
 });
 
 trainTypeSelect.addEventListener("change", () => {
