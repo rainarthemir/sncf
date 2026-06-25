@@ -5,7 +5,7 @@ const boardBody = document.getElementById("board-body");
 const trainTypeSelect = document.getElementById("trainType");
 const refreshBtn = document.getElementById("refreshBtn");
 
-// Конфигурация TER API (buildId может меняться, при необходимости обновите)
+// Конфигурация TER Next.js API (buildId может меняться, обновите при необходимости)
 const TER_BUILD_ID = "LjbgjtFQUzPTlTXVfIXVx";
 const TER_REGION = "hauts-de-france";
 
@@ -24,6 +24,7 @@ function escapeHtml(s = "") {
   }[c]));
 }
 
+// Нормализация текста (убираем акценты, лишние пробелы, верхний регистр)
 function norm(str) {
   return str
     ?.normalize("NFD")
@@ -33,12 +34,12 @@ function norm(str) {
     .toUpperCase() || "";
 }
 
+// Форматирование времени из строки Navitia или TER (ISO с T)
 function formatTimeFromNavitia(ts) {
   if (!ts) return "—";
   if (ts.includes('T') && ts.length >= 13) {
     const timePart = ts.split('T')[1];
     if (timePart && timePart.length >= 4) {
-      // Обрабатываем как "HH:MM:SS±hh:mm" или "HHMMSS"
       let hh, mm;
       if (timePart.includes(':')) {
         const parts = timePart.split(':');
@@ -64,7 +65,7 @@ function getSlug(name) {
     .replace(/^-|-$/g, '');
 }
 
-// Извлечение UIC‑кода из идентификатора Navitia
+// Извлечение UIC-кода из идентификатора Navitia (последняя часть после ":")
 function extractUIC(stopId) {
   const parts = stopId.split(':');
   return parts[parts.length - 1];
@@ -106,7 +107,6 @@ async function fetchDeparturesTER(stopId, stationName) {
       const dest = line.destination || {};
       const events = circ.events || [];
       
-      // Определяем статус
       let status = 'on time';
       let isCancelled = false;
       let delayMinutes = 0;
@@ -125,7 +125,6 @@ async function fetchDeparturesTER(stopId, stationName) {
         }
       });
 
-      // Если есть задержка, но не отменён
       if (delayMinutes > 0 && !isCancelled) {
         status = 'delayed';
       }
@@ -142,9 +141,10 @@ async function fetchDeparturesTER(stopId, stationName) {
         stop_date_time: {
           base_departure_date_time: circ.departureDate,
           departure_date_time: realDeparture,
-          departure_delay: delayMinutes * 60, // в секундах для совместимости
+          departure_delay: delayMinutes * 60, // в секундах
         },
-        // Для кликабельности используем line.number (можно расширить при необходимости)
+        // Сохраняем номер платформы (поле track)
+        track: circ.track || null,
         vehicle_journey: { id: line.number ? `TER-${line.number}` : null }
       };
     });
@@ -182,10 +182,8 @@ async function fetchDeparturesNavitia(stopId) {
 async function fetchDepartures(stopId, stationName) {
   if (!stopId) return;
   try {
-    // Сначала пробуем TER API
     let departures = await fetchDeparturesTER(stopId, stationName);
     if (!departures) {
-      // Если TER не удался, используем Navitia
       departures = await fetchDeparturesNavitia(stopId);
     }
     if (!departures || departures.length === 0) {
@@ -262,7 +260,10 @@ function renderBoard(departures) {
       timeCell = `<span class="on-time">${displayedTime}</span>`;
     }
 
-    // Логотипы (без изменений)
+    // ===== НОМЕР ПЛАТФОРМЫ =====
+    const platform = dep.track || '—';
+
+    // ===== ЛОГОТИПЫ (полный список) =====
     function getTrainLogo(info) {
       let logoHtml = "";
       let textHtml = "";
@@ -363,11 +364,13 @@ function renderBoard(departures) {
         <div class="col-mission">${escapeHtml(mission)}</div>
         <div class="col-destination">${escapeHtml(destination)}</div>
         <div class="col-time">${timeCell}</div>
+        <div class="col-platform">${escapeHtml(platform)}</div>
         <div class="col-type">${logoHtml} <span class="train-logo-text">${textHtml}</span></div>
       </div>
     `;
   }).join("");
 
+  // Кликабельность
   document.querySelectorAll('.clickable-train-row').forEach(row => {
     const clone = row.cloneNode(true);
     row.parentNode.replaceChild(clone, row);
