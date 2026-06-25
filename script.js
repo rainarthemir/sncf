@@ -1,14 +1,19 @@
+// ===== КОНФИГУРАЦИЯ =====
 const API_KEY = "e41a2be9-7450-4f1a-a7e6-eb429950186f";
+const WORKER_URL = "https://sncf-ter-ping.dmytrothemir.workers.dev/"; // ЗАМЕНИТЕ НА СВОЙ URL!
+
+// DOM элементы
 const stationInput = document.getElementById("stationSearch");
 const suggestionsBox = document.getElementById("suggestions");
 const boardBody = document.getElementById("board-body");
 const trainTypeSelect = document.getElementById("trainType");
 const refreshBtn = document.getElementById("refreshBtn");
 
-// Конфигурация TER Next.js API (buildId может меняться, обновите при необходимости)
+// Конфигурация TER Next.js API
 const TER_BUILD_ID = "LjbgjtFQUzPTlTXVfIXVx";
 const TER_REGION = "hauts-de-france";
 
+// Переменные состояния
 let currentStation = null;
 let currentStationName = '';
 let lastDepartures = [];
@@ -24,7 +29,6 @@ function escapeHtml(s = "") {
   }[c]));
 }
 
-// Нормализация текста (убираем акценты, лишние пробелы, верхний регистр)
 function norm(str) {
   return str
     ?.normalize("NFD")
@@ -34,7 +38,6 @@ function norm(str) {
     .toUpperCase() || "";
 }
 
-// Форматирование времени из строки Navitia или TER (ISO с T)
 function formatTimeFromNavitia(ts) {
   if (!ts) return "—";
   if (ts.includes('T') && ts.length >= 13) {
@@ -55,7 +58,6 @@ function formatTimeFromNavitia(ts) {
   return "—";
 }
 
-// Преобразование названия станции в slug для TER API
 function getSlug(name) {
   return name
     .normalize("NFD")
@@ -65,7 +67,6 @@ function getSlug(name) {
     .replace(/^-|-$/g, '');
 }
 
-// Извлечение UIC-кода из идентификатора Navitia (последняя часть после ":")
 function extractUIC(stopId) {
   const parts = stopId.split(':');
   return parts[parts.length - 1];
@@ -76,7 +77,9 @@ async function searchStations(q) {
   if (!q || q.trim().length < 2) return [];
   const url = `https://api.sncf.com/v1/coverage/sncf/places?q=${encodeURIComponent(q)}&type[]=stop_area&count=50`;
   try {
-    const res = await fetch(url, { headers: { Authorization: "Basic " + btoa(API_KEY + ":") } });
+    const res = await fetch(url, { 
+      headers: { Authorization: "Basic " + btoa(API_KEY + ":") } 
+    });
     if (!res.ok) return [];
     const json = await res.json();
     return (json.places || []).map(p => ({
@@ -88,21 +91,34 @@ async function searchStations(q) {
   }
 }
 
-// ===================== ПОЛУЧЕНИЕ ДАННЫХ ЧЕРЕЗ TER API =====================
+// ===================== TER API ЧЕРЕЗ CLOUDFLARE WORKER =====================
 async function fetchDeparturesTER(stopId, stationName) {
   const uic = extractUIC(stopId);
   const slug = getSlug(stationName);
-  const url = `https://www.ter.sncf.com/_next/data/${TER_BUILD_ID}/${TER_REGION}/se-deplacer/prochains-departs/${slug}-${uic}.json?region=${TER_REGION}&uicCode=${slug}-${uic}`;
+  
+  // Формируем целевой URL TER
+  const targetUrl = `https://www.ter.sncf.com/_next/data/${TER_BUILD_ID}/${TER_REGION}/se-deplacer/prochains-departs/${slug}-${uic}.json?region=${TER_REGION}&uicCode=${slug}-${uic}`;
+  
+  // Запрос через Cloudflare Worker (с проксированием)
+  const proxyUrl = `${WORKER_URL}?url=${encodeURIComponent(targetUrl)}`;
 
   try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`TER API error: ${res.status}`);
+    const res = await fetch(proxyUrl);
+    
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(`Worker error: ${res.status} - ${errorData.message || res.statusText}`);
+    }
+    
     const json = await res.json();
     const data = json.pageProps?.data;
-    if (!data || !data.circulations) throw new Error('Invalid TER data structure');
+    
+    if (!data || !data.circulations) {
+      throw new Error('Invalid TER data structure');
+    }
 
-    // Преобразуем circulations в формат, совместимый с renderBoard
-    const departures = data.circulations.map(circ => {
+    // Преобразуем данные в единый формат
+    return data.circulations.map(circ => {
       const line = circ.line || {};
       const dest = line.destination || {};
       const events = circ.events || [];
@@ -141,24 +157,23 @@ async function fetchDeparturesTER(stopId, stationName) {
         stop_date_time: {
           base_departure_date_time: circ.departureDate,
           departure_date_time: realDeparture,
-          departure_delay: delayMinutes * 60, // в секундах
+          departure_delay: delayMinutes * 60,
         },
-        // Сохраняем номер платформы (поле track)
         track: circ.track || null,
         vehicle_journey: { id: line.number ? `TER-${line.number}` : null }
       };
     });
-
-    return departures;
+    
   } catch (err) {
-    console.warn('TER API failed, falling back to Navitia:', err);
+    console.warn('TER API через Worker не удался, переключаемся на Navitia:', err);
     return null;
   }
 }
 
-// ===================== ПОЛУЧЕНИЕ ДАННЫХ ЧЕРЕЗ NAVITIA (старый метод) =====================
+// ===================== NAVITIA (резервный источник) =====================
 async function fetchDeparturesNavitia(stopId) {
   if (!stopId) return null;
+  
   const now = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Paris" })
     .replace(/[-:T ]/g, "")
     .slice(0, 14);
@@ -169,9 +184,11 @@ async function fetchDeparturesNavitia(stopId) {
     const res = await fetch(url, {
       headers: { Authorization: "Basic " + btoa(API_KEY + ":") }
     });
+    
     if (!res.ok) throw new Error(`Navitia error: ${res.status}`);
     const json = await res.json();
     return json.departures || null;
+    
   } catch (err) {
     console.error('Navitia fetch failed:', err);
     throw err;
@@ -181,17 +198,24 @@ async function fetchDeparturesNavitia(stopId) {
 // ===================== ОСНОВНАЯ ФУНКЦИЯ ЗАГРУЗКИ =====================
 async function fetchDepartures(stopId, stationName) {
   if (!stopId) return;
+  
   try {
+    // Сначала пытаемся получить данные через TER Worker
     let departures = await fetchDeparturesTER(stopId, stationName);
+    
+    // Если TER не сработал, используем Navitia
     if (!departures) {
       departures = await fetchDeparturesNavitia(stopId);
     }
+    
     if (!departures || departures.length === 0) {
       boardBody.innerHTML = `<div class="no-data">Aucun départ trouvé</div>`;
       return;
     }
+    
     lastDepartures = departures;
     renderBoard(lastDepartures);
+    
   } catch (err) {
     boardBody.innerHTML = `<div class="no-data">Erreur de connexion<br>${err.message}</div>`;
   }
@@ -260,14 +284,12 @@ function renderBoard(departures) {
       timeCell = `<span class="on-time">${displayedTime}</span>`;
     }
 
-    // ===== НОМЕР ПЛАТФОРМЫ =====
     const platform = dep.track || '—';
 
-    // ===== ЛОГОТИПЫ (полный список) =====
+    // ===== ЛОГОТИПЫ =====
     function getTrainLogo(info) {
       let logoHtml = "";
       let textHtml = "";
-      
       const commercialMode = norm(info.commercial_mode || "");
 
       if (commercialMode === "TGV" || commercialMode === "TGV INOUI") {
@@ -370,7 +392,6 @@ function renderBoard(departures) {
     `;
   }).join("");
 
-  // Кликабельность
   document.querySelectorAll('.clickable-train-row').forEach(row => {
     const clone = row.cloneNode(true);
     row.parentNode.replaceChild(clone, row);
