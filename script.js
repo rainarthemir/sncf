@@ -1,6 +1,6 @@
 // ===== КОНФИГУРАЦИЯ =====
 const API_KEY = "e41a2be9-7450-4f1a-a7e6-eb429950186f";
-const WORKER_URL = "https://sncf-ter-ping.dmytrothemir.workers.dev/"; // Замените на свой
+const WORKER_URL = "https://sncf-ter-ping.dmytrothemir.workers.dev/";
 
 const TER_BUILD_ID = "LjbgjtFQUzPTlTXVfIXVx";
 const TER_REGION = "hauts-de-france";
@@ -94,7 +94,10 @@ async function fetchDeparturesTER(stopId, stationName) {
   const uic = extractUIC(stopId);
   const slug = getSlug(stationName);
   
+  // Формируем чистый URL без encodeURIComponent
   const targetUrl = `https://www.ter.sncf.com/_next/data/${TER_BUILD_ID}/${TER_REGION}/se-deplacer/prochains-departs/${slug}-${uic}.json?region=${TER_REGION}&uicCode=${slug}-${uic}`;
+  
+  // Передаём URL как есть, Worker сам его закодирует если нужно
   const proxyUrl = `${WORKER_URL}?url=${encodeURIComponent(targetUrl)}`;
 
   try {
@@ -115,6 +118,9 @@ async function fetchDeparturesTER(stopId, stationName) {
     if (!data || !data.circulations) {
       throw new Error('Invalid TER data');
     }
+
+    console.log('✅ TER API успешно ответил, получено', data.circulations.length, 'поездов');
+    console.log('Платформы:', data.circulations.map(c => c.track).filter(Boolean));
 
     return data.circulations.map(circ => {
       const line = circ.line || {};
@@ -157,7 +163,7 @@ async function fetchDeparturesTER(stopId, stationName) {
           departure_date_time: realDeparture,
           departure_delay: delayMinutes * 60,
         },
-        track: circ.track || null,  // Номер платформы!
+        track: circ.track || null,
         vehicle_journey: { id: line.number ? `TER-${line.number}` : null }
       };
     });
@@ -196,7 +202,10 @@ async function fetchDepartures(stopId, stationName) {
   boardBody.innerHTML = `<div class="loading">Chargement...</div>`;
 
   try {
+    // Сначала пробуем TER через Worker
     let departures = await fetchDeparturesTER(stopId, stationName);
+    
+    // Если TER не сработал, используем Navitia
     if (!departures) {
       console.log('Переключение на Navitia');
       departures = await fetchDeparturesNavitia(stopId);
