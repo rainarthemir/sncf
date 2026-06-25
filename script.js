@@ -1,6 +1,8 @@
 // ===== КОНФИГУРАЦИЯ =====
 const API_KEY = "e41a2be9-7450-4f1a-a7e6-eb429950186f";
-const WORKER_URL = "https://sncf-ter-ping.dmytrothemir.workers.dev/"; // ЗАМЕНИТЕ НА СВОЙ URL!
+const WORKER_URL = "https://sncf-ter-ping.dmytrothemir.workers.dev/";
+const PUBLIC_PROXY_1 = "https://corsproxy.io/?";
+const PUBLIC_PROXY_2 = "https://api.allorigins.win/raw?url=";
 
 // DOM элементы
 const stationInput = document.getElementById("stationSearch");
@@ -10,7 +12,7 @@ const trainTypeSelect = document.getElementById("trainType");
 const refreshBtn = document.getElementById("refreshBtn");
 
 // Конфигурация TER Next.js API
-const TER_BUILD_ID = "LjbgjtFQUzPTlTXVfIXVx";
+let TER_BUILD_ID = "LjbgjtFQUzPTlTXVfIXVx";
 const TER_REGION = "hauts-de-france";
 
 // Переменные состояния
@@ -91,7 +93,61 @@ async function searchStations(q) {
   }
 }
 
-// ===================== TER API ЧЕРЕЗ CLOUDFLARE WORKER =====================
+// ===================== ОБРАБОТКА ДАННЫХ TER =====================
+function processTERData(json) {
+  const data = json.pageProps?.data;
+  if (!data || !data.circulations) {
+    throw new Error('Invalid TER data structure');
+  }
+
+  return data.circulations.map(circ => {
+    const line = circ.line || {};
+    const dest = line.destination || {};
+    const events = circ.events || [];
+    
+    let status = 'on time';
+    let isCancelled = false;
+    let delayMinutes = 0;
+    let realDeparture = circ.departureDate;
+    
+    events.forEach(ev => {
+      if (ev.name === 'Deletion') {
+        isCancelled = true;
+        status = 'cancelled';
+      }
+      if (ev.name === 'Delay') {
+        delayMinutes = ev.duration || 0;
+        if (ev.departureDateIncident) {
+          realDeparture = ev.departureDateIncident;
+        }
+      }
+    });
+
+    if (delayMinutes > 0 && !isCancelled) {
+      status = 'delayed';
+    }
+
+    return {
+      display_informations: {
+        commercial_mode: 'TER',
+        headsign: `TER ${line.number || ''}`,
+        code: line.number || '',
+        direction: dest.name || '',
+        color: line.textBackground || '#0052a3',
+        status: status,
+      },
+      stop_date_time: {
+        base_departure_date_time: circ.departureDate,
+        departure_date_time: realDeparture,
+        departure_delay: delayMinutes * 60,
+      },
+      track: circ.track || null,
+      vehicle_journey: { id: line.number ? `TER-${line.number}` : null }
+    };
+  });
+}
+
+// ===================== TER API с несколькими прокси =====================
 async function fetchDeparturesTER(stopId, stationName) {
   const uic = extractUIC(stopId);
   const slug = getSlug(stationName);
@@ -99,75 +155,66 @@ async function fetchDeparturesTER(stopId, stationName) {
   // Формируем целевой URL TER
   const targetUrl = `https://www.ter.sncf.com/_next/data/${TER_BUILD_ID}/${TER_REGION}/se-deplacer/prochains-departs/${slug}-${uic}.json?region=${TER_REGION}&uicCode=${slug}-${uic}`;
   
-  // Запрос через Cloudflare Worker (с проксированием)
-  const proxyUrl = `${WORKER_URL}?url=${encodeURIComponent(targetUrl)}`;
-
+  // 1. Пытаемся через Cloudflare Worker
   try {
+    const proxyUrl = `${WORKER_URL}?url=${encodeURIComponent(targetUrl)}`;
+    console.log('Попытка через Cloudflare Worker:', proxyUrl);
     const res = await fetch(proxyUrl);
     
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      throw new Error(`Worker error: ${res.status} - ${errorData.message || res.statusText}`);
+    if (res.ok) {
+      const json = await res.json();
+      return processTERData(json);
+    } else if (res.status === 403) {
+      console.warn('Cloudflare Worker вернул 403, пробуем публичный прокси');
+    } else {
+      console.warn(`Cloudflare Worker ошибка: ${res.status}`);
     }
-    
-    const json = await res.json();
-    const data = json.pageProps?.data;
-    
-    if (!data || !data.circulations) {
-      throw new Error('Invalid TER data structure');
-    }
+  } catch (err) {
+    console.warn('Cloudflare Worker недоступен:', err.message);
+  }
 
-    // Преобразуем данные в единый формат
-    return data.circulations.map(circ => {
-      const line = circ.line || {};
-      const dest = line.destination || {};
-      const events = circ.events || [];
-      
-      let status = 'on time';
-      let isCancelled = false;
-      let delayMinutes = 0;
-      let realDeparture = circ.departureDate;
-      
-      events.forEach(ev => {
-        if (ev.name === 'Deletion') {
-          isCancelled = true;
-          status = 'cancelled';
-        }
-        if (ev.name === 'Delay') {
-          delayMinutes = ev.duration || 0;
-          if (ev.departureDateIncident) {
-            realDeparture = ev.departureDateIncident;
-          }
-        }
-      });
-
-      if (delayMinutes > 0 && !isCancelled) {
-        status = 'delayed';
-      }
-
-      return {
-        display_informations: {
-          commercial_mode: 'TER',
-          headsign: `TER ${line.number || ''}`,
-          code: line.number || '',
-          direction: dest.name || '',
-          color: line.textBackground || '#0052a3',
-          status: status,
-        },
-        stop_date_time: {
-          base_departure_date_time: circ.departureDate,
-          departure_date_time: realDeparture,
-          departure_delay: delayMinutes * 60,
-        },
-        track: circ.track || null,
-        vehicle_journey: { id: line.number ? `TER-${line.number}` : null }
-      };
+  // 2. Пытаемся через публичный CORS-прокси (corsproxy.io)
+  try {
+    const proxyUrl = `${PUBLIC_PROXY_1}${encodeURIComponent(targetUrl)}`;
+    console.log('Попытка через corsproxy.io');
+    const res = await fetch(proxyUrl, {
+      headers: { 'Origin': 'https://www.ter.sncf.com' }
     });
     
+    if (res.ok) {
+      const json = await res.json();
+      return processTERData(json);
+    } else {
+      console.warn(`corsproxy.io ошибка: ${res.status}`);
+    }
   } catch (err) {
-    console.warn('TER API через Worker не удался, переключаемся на Navitia:', err);
-    return null;
+    console.warn('corsproxy.io недоступен:', err.message);
   }
+
+  // 3. Пытаемся через allorigins.win
+  try {
+    const proxyUrl = `${PUBLIC_PROXY_2}${encodeURIComponent(targetUrl)}`;
+    console.log('Попытка через allorigins.win');
+    const res = await fetch(proxyUrl);
+    
+    if (res.ok) {
+      const json = await res.json();
+      // allorigins.win возвращает данные в поле 'contents'
+      if (json.contents) {
+        const parsed = JSON.parse(json.contents);
+        return processTERData(parsed);
+      }
+      return processTERData(json);
+    } else {
+      console.warn(`allorigins.win ошибка: ${res.status}`);
+    }
+  } catch (err) {
+    console.warn('allorigins.win недоступен:', err.message);
+  }
+
+  // Если все прокси не сработали
+  console.warn('Все прокси TER не сработали');
+  return null;
 }
 
 // ===================== NAVITIA (резервный источник) =====================
@@ -199,17 +246,20 @@ async function fetchDeparturesNavitia(stopId) {
 async function fetchDepartures(stopId, stationName) {
   if (!stopId) return;
   
+  boardBody.innerHTML = `<div class="loading">Chargement des départs...</div>`;
+  
   try {
-    // Сначала пытаемся получить данные через TER Worker
+    // Сначала пытаемся TER (с прокси)
     let departures = await fetchDeparturesTER(stopId, stationName);
     
     // Если TER не сработал, используем Navitia
     if (!departures) {
+      console.log('Переключение на Navitia API');
       departures = await fetchDeparturesNavitia(stopId);
     }
     
     if (!departures || departures.length === 0) {
-      boardBody.innerHTML = `<div class="no-data">Aucun départ trouvé</div>`;
+      boardBody.innerHTML = `<div class="no-data">Aucun départ trouvé pour cette gare</div>`;
       return;
     }
     
@@ -217,7 +267,8 @@ async function fetchDepartures(stopId, stationName) {
     renderBoard(lastDepartures);
     
   } catch (err) {
-    boardBody.innerHTML = `<div class="no-data">Erreur de connexion<br>${err.message}</div>`;
+    console.error('Ошибка загрузки:', err);
+    boardBody.innerHTML = `<div class="no-data">Erreur de connexion: ${err.message}</div>`;
   }
 }
 
